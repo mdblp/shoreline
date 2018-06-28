@@ -12,6 +12,14 @@ addons:
     packages:
       - mongodb-org-server
 
+before_install:
+#  - RepoName=`basename $PWD`; SrcDir=`dirname $PWD`; DestDir="`dirname $SrcDir`/tidepool-org"
+#  - if [[ "$SrcDir" != "$DestDir" ]]; then mv "$SrcDir" "$DestDir"; cd ../../tidepool-org/$RepoName; export TRAVIS_BUILD_DIR=`dirname $TRAVIS_BUILD_DIR`/$RepoName; fi
+  - mkdir -p $HOME/gopath/src/github.com/mdblp/shoreline
+  - rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/github.com/tidepool-org/shoreline/
+  - export TRAVIS_BUILD_DIR=$HOME/gopath/src/github.com/tidepool-org/shoreline
+  - cd $HOME/gopath/src/github.com/tidepool-org/shoreline
+
 deploy:
   # Control deployment by setting a value for `on`. Setting the `branch`
   # option to `master` means Travis will only attempt a deployment on
