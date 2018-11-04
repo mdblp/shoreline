@@ -1,18 +1,22 @@
 # Development
-FROM golang:1.9.2-alpine AS development
+FROM golang:1.10.2-alpine AS development
 
 WORKDIR /go/src/github.com/tidepool-org/shoreline
 
 COPY . .
 
-RUN  ./build.sh
+RUN apk --no-cache update && \
+    apk --no-cache upgrade && \
+    apk add build-base git cyrus-sasl-dev
+
+RUN  dos2unix build.sh && ./build.sh
 
 CMD ["./dist/shoreline"]
 
 # Release
 FROM alpine:latest AS release
 
-RUN ["apk", "add", "--no-cache", "ca-certificates"]
+RUN ["apk", "add", "--no-cache", "ca-certificates", "libsasl"]
 
 RUN ["adduser", "-D", "tidepool"]
 
