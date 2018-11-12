@@ -16,9 +16,10 @@ CMD ["./dist/shoreline"]
 # Release
 FROM alpine:latest AS release
 
-RUN ["apk", "add", "--no-cache", "ca-certificates", "libsasl"]
-
-RUN ["adduser", "-D", "tidepool"]
+RUN apk --no-cache update && \
+    apk --no-cache upgrade && \
+    apk add --no-cache ca-certificates libsasl && \
+    adduser -D tidepool
 
 WORKDIR /home/tidepool
 
