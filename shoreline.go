@@ -9,15 +9,14 @@ import (
 	"syscall"
 
 	"github.com/gorilla/mux"
-
-	common "github.com/tidepool-org/go-common"
+	"github.com/mdblp/shoreline/oauth2"
+	"github.com/mdblp/shoreline/user"
+	"github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
 	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/highwater"
 	"github.com/tidepool-org/go-common/clients/mongo"
-	"github.com/tidepool-org/shoreline/oauth2"
-	"github.com/tidepool-org/shoreline/user"
 )
 
 type (
@@ -75,7 +74,7 @@ func main() {
 	 * User-Api setup
 	 */
 
-	log.Print(shoreline_service_prefix, "adding", user.USER_API_PREFIX)
+	log.Print(shoreline_service_prefix, "adding ", user.USER_API_PREFIX)
 
 	userapi := user.InitApi(config.User, user.NewMongoStoreClient(&config.Mongo), highwater)
 	userapi.SetHandlers("", rtr)
@@ -88,14 +87,14 @@ func main() {
 		WithTokenProvider(userClient).
 		Build()
 
-	log.Print(shoreline_service_prefix, "adding", "permsClient")
+	log.Print(shoreline_service_prefix, "adding ", "permsClient")
 	userapi.AttachPerms(permsClient)
 
 	/*
 	 * Oauth setup
 	 */
 
-	log.Print(shoreline_service_prefix, "adding", oauth2.OAUTH2_API_PREFIX)
+	log.Print(shoreline_service_prefix, "adding ", oauth2.OAUTH2_API_PREFIX)
 
 	oauthapi := oauth2.InitApi(config.Oauth2, oauth2.NewOAuthStorage(&config.Mongo), userClient, permsClient)
 	oauthapi.SetHandlers("", rtr)

@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/mdblp/shoreline/common"
+	"github.com/mdblp/shoreline/oauth2"
+	"github.com/mdblp/shoreline/user/mailchimp"
 
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/highwater"
 	"github.com/tidepool-org/go-common/clients/status"
-	"github.com/tidepool-org/shoreline/common"
-	"github.com/tidepool-org/shoreline/oauth2"
-	"github.com/tidepool-org/shoreline/user/mailchimp"
 )
 
 type (
@@ -85,6 +85,8 @@ const (
 	STATUS_UNAUTHORIZED          = "Not authorized for requested operation"
 	STATUS_NO_QUERY              = "A query must be specified"
 	STATUS_INVALID_ROLE          = "The role specified is invalid"
+
+	STATUS_OK = "OK"
 )
 
 func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
@@ -116,6 +118,8 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 	rtr.HandleFunc("/status", a.GetStatus).Methods("GET")
 
 	rtr.HandleFunc("/users", a.GetUsers).Methods("GET")
+
+	rtr.HandleFunc("/checkUser", a.CheckUser).Methods("GET")
 
 	rtr.Handle("/user", varsHandler(a.GetUserInfo)).Methods("GET")
 	rtr.Handle("/user/{userid}", varsHandler(a.GetUserInfo)).Methods("GET")
@@ -155,6 +159,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	res.WriteHeader(http.StatusOK)
+	res.Write([]byte(STATUS_OK))
 	return
 }
 
@@ -178,6 +183,33 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
 
 	} else if users, err := a.Store.FindUsersByRole(role); err != nil {
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
+
+	} else {
+		a.logMetric("getusers", sessionToken, map[string]string{"server": strconv.FormatBool(tokenData.IsServer)})
+		a.sendUsers(res, users, tokenData.IsServer)
+	}
+}
+
+// CheckUser checks existence of user identified by username (=email)
+func (a *Api) CheckUser(res http.ResponseWriter, req *http.Request) {
+	sessionToken := req.Header.Get(TP_SESSION_TOKEN)
+	username := req.URL.Query().Get("username")
+
+	if username == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
+	}
+	var user User
+	user.Username = username
+	if tokenData, err := a.authenticateSessionToken(sessionToken); err != nil {
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
+
+	} else if !tokenData.IsServer {
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
+	} else if username == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
+
+	} else if users, err := a.Store.FindUsers(&user); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
 
 	} else {
@@ -530,6 +562,8 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 		} else {
 			a.logMetricAsServer("serverlogin", sessionToken.ID, nil)
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
+			res.WriteHeader(http.StatusOK)
+			res.Write([]byte(STATUS_OK))
 			return
 		}
 	}

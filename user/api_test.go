@@ -16,10 +16,9 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-
+	"github.com/mdblp/shoreline/oauth2"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/highwater"
-	"github.com/tidepool-org/shoreline/oauth2"
 )
 
 const (
@@ -388,6 +387,59 @@ func Test_GetUsers_Error_Success(t *testing.T) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+/* func Test_CheckUser_Error_MissingSessionToken(t *testing.T) {
+	response := T_PerformRequest(t, "GET", "/checkuser?username=test")
+	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
+}
+
+func Test_CheckUser_Error_TokenError(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{nil, errors.New("ERROR")}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/checkuser?username=test", headers)
+	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
+}
+
+func Test_CheckUser_Error_NotServerToken(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", false, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/checkuser?username=test", headers)
+	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
+}
+
+func Test_CheckUser_Error_NoQuery(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/checkuser", headers)
+	T_ExpectErrorResponse(t, response, 400, "A query must be specified")
+}
+
+func Test_CheckUser_Error_Success(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{{Id: "0000000000"}, {Id: "1111111111"}}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/checkuser?username=test@diabeloop.fr", headers)
+	successResponse := T_ExpectSuccessResponseWithJSONArray(t, response, 200)
+	T_ExpectEqualsArray(t, successResponse, []interface{}{map[string]interface{}{"userid": "0000000000", "passwordExists": false}, map[string]interface{}{"userid": "1111111111", "passwordExists": false}})
+}
+
+*/ ////////////////////////////////////////////////////////////////////////////////
 
 func Test_CreateUser_Error_MissingBody(t *testing.T) {
 	response := T_PerformRequest(t, "POST", "/user")
@@ -2057,7 +2109,7 @@ func Test_AuthenticateSessionToken_Success_User(t *testing.T) {
 		t.Fatalf("Unexpected server token")
 	}
 	if tokenData.DurationSecs != TOKEN_DURATION {
-		t.Fatalf("Unexpected token duration: %f", tokenData.DurationSecs)
+		t.Fatalf("Unexpected token duration: %d", tokenData.DurationSecs)
 	}
 }
 
@@ -2080,7 +2132,7 @@ func Test_AuthenticateSessionToken_Success_Server(t *testing.T) {
 		t.Fatalf("Unexpected non-server token")
 	}
 	if tokenData.DurationSecs != TOKEN_DURATION {
-		t.Fatalf("Unexpected token duration: %f", tokenData.DurationSecs)
+		t.Fatalf("Unexpected token duration: %d", tokenData.DurationSecs)
 	}
 }
 
