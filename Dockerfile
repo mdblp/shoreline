@@ -9,7 +9,9 @@ RUN apk --no-cache update && \
     apk --no-cache upgrade && \
     apk add build-base git cyrus-sasl-dev
 
-RUN  dos2unix build.sh && ./build.sh
+RUN dos2unix build.sh && \
+    dos2unix test.sh && \
+    ./build.sh
 
 CMD ["./dist/shoreline"]
 
