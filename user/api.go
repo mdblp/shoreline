@@ -33,26 +33,26 @@ type (
 		mailchimpManager mailchimp.Manager
 	}
 	Secret struct {
-		Secret           string `json:"secret"`
-		Pass		      string `json:"pass"`
+		Secret string `json:"secret"`
+		Pass   string `json:"pass"`
 	}
 	ApiConfig struct {
 		//used for services
-		secrets 			 	[]Secret `json:"secrets"`
-		ServerSecrets			map[string]string
-		LongTermKey          	string `json:"longTermKey"`
-		LongTermDaysDuration 	int    `json:"longTermDaysDuration"`
+		secrets              []Secret `json:"secrets"`
+		ServerSecrets        map[string]string
+		LongTermKey          string `json:"longTermKey"`
+		LongTermDaysDuration int    `json:"longTermDaysDuration"`
 		//so we can change the default lifetime of the token
 		//we use seconds, this also helps for testing as you can time it out easily
-		TokenDurationSecs 		int64 `json:"tokenDurationSecs"`
+		TokenDurationSecs int64 `json:"tokenDurationSecs"`
 		//used for pw
-		Salt 					string `json:"salt"`
+		Salt string `json:"salt"`
 		//used for token
-		Secret 					string `json:"apiSecret"`
+		Secret string `json:"apiSecret"`
 		//allows for the skipping of verification for testing
-		VerificationSecret 		string           `json:"verificationSecret"`
-		ClinicDemoUserID   		string           `json:"clinicDemoUserId"`
-		Mailchimp          		mailchimp.Config `json:"mailchimp"`
+		VerificationSecret string           `json:"verificationSecret"`
+		ClinicDemoUserID   string           `json:"clinicDemoUserId"`
+		Mailchimp          mailchimp.Config `json:"mailchimp"`
 	}
 	varsHandler func(http.ResponseWriter, *http.Request, map[string]string)
 )
@@ -90,8 +90,8 @@ const (
 	STATUS_UNAUTHORIZED          = "Not authorized for requested operation"
 	STATUS_NO_QUERY              = "A query must be specified"
 	STATUS_INVALID_ROLE          = "The role specified is invalid"
-	STATUS_OK        			 = "OK"
-	STATUS_NO_EXPECTED_PWD		 = "No expected password is found"
+	STATUS_OK                    = "OK"
+	STATUS_NO_EXPECTED_PWD       = "No expected password is found"
 )
 
 func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
@@ -555,7 +555,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_NO_EXPECTED_PWD), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// If the expected secret is the one given at the door then we can generate a token
 	if pw == expectedSecret {
 		//generate new token

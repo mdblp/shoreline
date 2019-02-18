@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	THE_SECRET   = "shhh! don't tell"
+	THE_SECRET   = "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"
 	MAKE_IT_FAIL = true
 )
 
@@ -35,8 +35,8 @@ var (
 	NO_PARAMS      = map[string]string{}
 	TOKEN_DURATION = int64(3600)
 	FAKE_CONFIG    = ApiConfig{
-		ServerSecrets:       map[string]string{"default": "shhh! don't tell"},
-		Secret:             "shhh! don't tell *2",
+		secrets: []Secret{Secret{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
+			Secret{Secret: "product_website", Pass: "Not so secret"}},
 		TokenDurationSecs:  TOKEN_DURATION,
 		LongTermKey:        "thelongtermkey",
 		Salt:               "a mineral substance composed primarily of sodium chloride",
