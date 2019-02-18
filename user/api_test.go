@@ -37,6 +37,7 @@ var (
 	FAKE_CONFIG    = ApiConfig{
 		secrets: []Secret{Secret{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
 			Secret{Secret: "product_website", Pass: "Not so secret"}},
+		Secret:             "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
 		TokenDurationSecs:  TOKEN_DURATION,
 		LongTermKey:        "thelongtermkey",
 		Salt:               "a mineral substance composed primarily of sodium chloride",
