@@ -4,7 +4,11 @@ import (
 	"strings"
 	"testing"
 
+<<<<<<< HEAD
 	mgo "gopkg.in/mgo.v2"
+=======
+	"github.com/globalsign/mgo"
+>>>>>>> 170f0a8... Updated mongo version.  Updated to Go 1.11.4
 
 	"github.com/tidepool-org/go-common/clients/mongo"
 )
