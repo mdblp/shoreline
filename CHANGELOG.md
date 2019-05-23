@@ -2,6 +2,12 @@
 
 Shoreline is the module that manages logins and user accounts.
 
+## [Unreleased]
+
+### Added
+
+- Merge from upstream Tidepool
+
 ## dblp.0.1.4 - 2019-04-17
 
 ### Changed
