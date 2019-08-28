@@ -26,7 +26,7 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 
 	mongoSession, err := mongo.Connect(config)
 	if err != nil {
-		log.Fatalf("Cannot connect to mongo: %v, %v", config, err)
+		log.Fatalf("Cannot connect to mongo: %v", err)
 	}
 
 	return &MongoStoreClient{
@@ -50,7 +50,10 @@ func (d MongoStoreClient) Close() {
 
 func (d MongoStoreClient) Ping() error {
 	// do we have a store session
-	if err := d.session.Ping(); err != nil {
+	cpy := d.session.Copy()
+	defer cpy.Close()
+
+	if err := cpy.Ping(); err != nil {
 		return err
 	}
 	return nil

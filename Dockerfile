@@ -1,11 +1,19 @@
 # Development
 FROM golang:1.12.7-alpine AS development
 
-WORKDIR /go/src/github.com/tidepool-org/shoreline
+RUN apk --no-cache update && \
+    apk --no-cache upgrade && \
+    apk add build-base git
 
+ENV GO111MODULE on
+
+WORKDIR /go/src/github.com/mdblp
+RUN git clone --branch feature/pt582-0.4.1 https://github.com/mdblp/go-common.git
+
+WORKDIR /go/src/github.com/mdblp/shoreline
 COPY . .
-
-RUN  ./build.sh
+RUN go get
+RUN ./build.sh
 
 CMD ["./dist/shoreline"]
 
@@ -15,12 +23,12 @@ FROM alpine:latest AS release
 RUN apk --no-cache update && \
     apk --no-cache upgrade && \
     apk add --no-cache ca-certificates && \
-    adduser -D tidepool
+    adduser -D mdblp
 
-WORKDIR /home/tidepool
+WORKDIR /home/mdblp
 
-USER tidepool
+USER mdblp
 
-COPY --from=development --chown=tidepool /go/src/github.com/tidepool-org/shoreline/dist/shoreline .
+COPY --from=development --chown=mdblp /go/src/github.com/mdblp/shoreline/dist/shoreline .
 
 CMD ["./shoreline"]
