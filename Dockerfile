@@ -1,11 +1,17 @@
 # Development
 FROM golang:1.12.7-alpine AS development
 
-WORKDIR /go/src/github.com/tidepool-org/shoreline
+RUN apk --no-cache update && \
+    apk --no-cache upgrade && \
+    apk add build-base git
 
+# Using Go module (go 1.12 need this variable to be set to enable modules)
+ENV GO111MODULE on
+
+WORKDIR /go/src/github.com/mdblp/shoreline
 COPY . .
-
-RUN  ./build.sh
+RUN go get
+RUN ./build.sh
 
 CMD ["./dist/shoreline"]
 
@@ -21,6 +27,6 @@ WORKDIR /home/tidepool
 
 USER tidepool
 
-COPY --from=development --chown=tidepool /go/src/github.com/tidepool-org/shoreline/dist/shoreline .
+COPY --from=development --chown=tidepool /go/src/github.com/mdblp/shoreline/dist/shoreline .
 
 CMD ["./shoreline"]
