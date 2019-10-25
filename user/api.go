@@ -176,6 +176,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 		log.Printf("Error marshaling StatusApi data [%s]", s)
 		http.Error(res, "Error marshaling data for response", http.StatusInternalServerError)
 	} else {
+		res.Header().Set("content-type", "application/json")
 		res.WriteHeader(s.Status.Code)
 		res.Write(jsonDetails)
 	}
