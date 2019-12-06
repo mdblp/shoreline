@@ -16,14 +16,15 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/highwater"
+	"github.com/tidepool-org/go-common/clients/version"
+
 	"github.com/tidepool-org/shoreline/oauth2"
 )
 
 const (
-	THE_SECRET   = "shhh! don't tell"
+	THE_SECRET   = "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"
 	MAKE_IT_FAIL = true
 )
 
@@ -35,8 +36,9 @@ var (
 	NO_PARAMS      = map[string]string{}
 	TOKEN_DURATION = int64(3600)
 	FAKE_CONFIG    = ApiConfig{
-		ServerSecret:       "shhh! don't tell",
-		Secret:             "shhh! don't tell *2",
+		Secrets: []Secret{Secret{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
+			Secret{Secret: "product_website", Pass: "Not so secret"}},
+		Secret:             "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
 		TokenDurationSecs:  TOKEN_DURATION,
 		LongTermKey:        "thelongtermkey",
 		Salt:               "a mineral substance composed primarily of sodium chloride",
@@ -85,7 +87,7 @@ func InitShoreline(config ApiConfig, store Storage, metrics highwater.Client, pe
 ////////////////////////////////////////////////////////////////////////////////
 
 func T_CreateAuthorization(t *testing.T, email string, password string) string {
-	return fmt.Sprintf("Basic %s", base64.URLEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", email, password))))
+	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", email, password))))
 }
 
 func T_CreateSessionToken(t *testing.T, userId string, isServer bool, duration int64) *SessionToken {
@@ -280,12 +282,20 @@ func TestGetStatus_StatusOk(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/status", nil)
 	response := httptest.NewRecorder()
 
+	version.ReleaseNumber = "1.2.3"
+	version.FullCommit = "e0c73b95646559e9a3696d41711e918398d557fb"
+
 	shoreline.SetHandlers("", rtr)
 
 	shoreline.GetStatus(response, request)
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("Resp given [%d] expected [%d] ", response.Code, http.StatusOK)
+	}
+	body, _ := ioutil.ReadAll(response.Body)
+
+	if string(body) != "{\"status\":{\"code\":200,\"reason\":\"OK\"},\"version\":\"1.2.3+e0c73b95646559e9a3696d41711e918398d557fb\"}" {
+		t.Fatalf("Message given [%s] expected [%s] ", string(body), "{\"status\":{\"code\":200,\"reason\":\"OK\"},\"version\":\"1.2.3+e0c73b95646559e9a3696d41711e918398d557fb\"}")
 	}
 
 }
@@ -294,6 +304,9 @@ func TestGetStatus_StatusInternalServerError(t *testing.T) {
 
 	request, _ := http.NewRequest("GET", "/status", nil)
 	response := httptest.NewRecorder()
+
+	version.ReleaseNumber = "1.2.3"
+	version.FullCommit = "e0c73b95646559e9a3696d41711e918398d557fb"
 
 	shorelineFails.SetHandlers("", rtr)
 
@@ -305,8 +318,8 @@ func TestGetStatus_StatusInternalServerError(t *testing.T) {
 
 	body, _ := ioutil.ReadAll(response.Body)
 
-	if string(body) != "Session failure" {
-		t.Fatalf("Message given [%s] expected [%s] ", string(body), "Session failure")
+	if string(body) != "{\"status\":{\"code\":500,\"reason\":\"Session failure\"},\"version\":\"1.2.3+e0c73b95646559e9a3696d41711e918398d557fb\"}" {
+		t.Fatalf("Message given [%s] expected [%s] ", string(body), "{\"status\":{\"code\":500,\"reason\":\"Session failure\"},\"version\":\"1.2.3+e0c73b95646559e9a3696d41711e918398d557fb\"}")
 	}
 
 }
@@ -362,7 +375,72 @@ func Test_GetUsers_Error_NoQuery(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 400, "A query must be specified")
 }
 
-func Test_GetUsers_Error_FindUsersError(t *testing.T) {
+func Test_GetUsers_Error_InvalidQuery(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/users?yolo=swag", headers)
+	T_ExpectErrorResponse(t, response, 400, "Unknown query parameter")
+}
+
+func Test_GetUsers_Error_FindUsersWithIdsError(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUsersWithIdsResponses = []FindUsersWithIdsResponse{{[]*User{}, errors.New("ERROR")}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/users?id=abcdef1234", headers)
+	T_ExpectErrorResponse(t, response, 500, "Error finding user")
+}
+
+func FindUsersWithIds(t *testing.T, userIds []string) {
+	rr := httptest.NewRecorder()
+
+	r, err := http.NewRequest("GET", "/users?id="+strings.Join(userIds, ","), nil)
+	r.Header.Set(TP_SESSION_TOKEN, SRVR_TOKEN.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shoreline.GetUsers(rr, r)
+
+	rs := rr.Result()
+
+	if rs.StatusCode != http.StatusOK {
+		t.Fatalf("want %d; got %d", http.StatusOK, rs.StatusCode)
+	}
+
+	defer rs.Body.Close()
+	body, err := ioutil.ReadAll(rs.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var users []User
+	json.Unmarshal(body, &users)
+	if users != nil && len(users) != len(userIds) {
+		t.Fatalf("Expected %d user(s) with IDs '%#v'. Got %#v", len(userIds), userIds, users)
+	}
+
+	for index, user := range userIds {
+		if user != users[index].Id {
+			t.Fatalf("Expected user with ID '%s'. Got %#v", user, users[index])
+		}
+	}
+}
+
+func Test_GetUsers_Error_FindUsersWithIdsSuccess(t *testing.T) {
+	FindUsersWithIds(t, []string{"0000000000"})
+	FindUsersWithIds(t, []string{"0000000001"})
+	FindUsersWithIds(t, []string{"0000000000", "0000000001"})
+}
+
+func Test_GetUsers_Error_FindUsersByRoleError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{}, errors.New("ERROR")}}
@@ -374,7 +452,7 @@ func Test_GetUsers_Error_FindUsersError(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 500, "Error finding user")
 }
 
-func Test_GetUsers_Error_Success(t *testing.T) {
+func Test_GetUsers_Error_FindUsersByRoleSuccess(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{{Id: "0000000000"}, {Id: "1111111111"}}, nil}}
@@ -639,6 +717,7 @@ func Test_CreateCustodialUser_Success_Known(t *testing.T) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+////////// UPDATE USER ////////////////////////////////////////////////////////
 
 func Test_UpdateUser_Error_MissingSessionToken(t *testing.T) {
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"emailVerified\": true, \"password\": \"newpassword\", \"termsAccepted\": \"2016-01-01T01:23:45-08:00\"}}"
@@ -836,6 +915,21 @@ func Test_UpdateUser_Error_FindUserDuplicateFound(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 409, "User already exists")
 }
 
+func Test_UpdateUser_Error_FindUserDuplicateFound2(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1234567890"}, &User{Id: "1234567898"}}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"]}}"
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestBodyHeaders(t, "PUT", "/user/1111111111", body, headers)
+	T_ExpectErrorResponse(t, response, 409, "User already exists")
+}
+
 func Test_UpdateUser_Error_UpsertUserError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
@@ -908,6 +1002,25 @@ func Test_UpdateUser_Success_UserFromUrl(t *testing.T) {
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
+	responsableStore.UpsertUserResponses = []error{nil}
+	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
+	responsableGatekeeper.SetPermissionsResponses = []PermissionsResponse{{clients.Permissions{}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"password\": \"newpassword\", \"termsAccepted\": \"2016-01-01T01:23:45-08:00\"}}"
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestBodyHeaders(t, "PUT", "/user/1111111111", body, headers)
+	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 200)
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": false, "emails": []interface{}{"a@z.co"}, "username": "a@z.co", "termsAccepted": "2016-01-01T01:23:45-08:00"})
+}
+
+func Test_UpdateUser_Success_UserWithUnchangedUsername(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
 	responsableGatekeeper.SetPermissionsResponses = []PermissionsResponse{{clients.Permissions{}, nil}}
@@ -1281,6 +1394,23 @@ func Test_Login_Error_ErrorCreatingToken(t *testing.T) {
 func Test_Login_Success(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+	responsableStore.AddTokenResponses = []error{nil}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add("Authorization", authorization)
+	response := T_PerformRequestHeaders(t, "POST", "/login", headers)
+	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 200)
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": true, "emails": []interface{}{"a@z.co"}, "username": "a@z.co", "termsAccepted": "2016-01-01T01:23:45-08:00"})
+	if response.Header().Get(TP_SESSION_TOKEN) == "" {
+		t.Fatalf("Missing expected %s header", TP_SESSION_TOKEN)
+	}
+}
+
+func Test_Login_Success_Password_Complex(t *testing.T) {
+	authorization := T_CreateAuthorization(t, "a@b.co", "`-=[]\\;',./~!@#$%^&*)(_+}{|\":<>?`¡™£¢∞§¶•ª–≠‘“æ…÷≥”’")
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "80464ae775ca97187d29bc4b3e391e959947138a", EmailVerified: true}}, nil}}
 	responsableStore.AddTokenResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1999,7 +2129,7 @@ func Test_AuthenticateSessionToken_Invalid(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Unexpected success")
 	}
-	if err.Error() != "Token contains an invalid number of segments" {
+	if err.Error() != "token contains an invalid number of segments" {
 		t.Fatalf("Unexpected error: %s", err.Error())
 	}
 	if tokenData != nil {
@@ -2057,7 +2187,7 @@ func Test_AuthenticateSessionToken_Success_User(t *testing.T) {
 		t.Fatalf("Unexpected server token")
 	}
 	if tokenData.DurationSecs != TOKEN_DURATION {
-		t.Fatalf("Unexpected token duration: %f", tokenData.DurationSecs)
+		t.Fatalf("Unexpected token duration: %v", tokenData.DurationSecs)
 	}
 }
 
@@ -2080,7 +2210,7 @@ func Test_AuthenticateSessionToken_Success_Server(t *testing.T) {
 		t.Fatalf("Unexpected non-server token")
 	}
 	if tokenData.DurationSecs != TOKEN_DURATION {
-		t.Fatalf("Unexpected token duration: %f", tokenData.DurationSecs)
+		t.Fatalf("Unexpected token duration: %v", tokenData.DurationSecs)
 	}
 }
 
