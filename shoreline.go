@@ -19,6 +19,7 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -58,6 +59,68 @@ func main() {
 		log.Panic("Problem loading config", err)
 	}
 
+	// server secret may be passed via a separate env variable to accomodate easy secrets injection via Kubernetes
+	// The server secret is the password any Tidepool service is supposed to know and pass to shoreline for authentication and for getting token
+	// With Mdblp, we consider we can have different server secrets
+	// These secrets are hosted in a map[string][string] instead of single string
+	// which 1st string represents Server/Service name and 2nd represents the actual secret
+	// here we consider this SERVER_SECRET that can be injected via Kubernetes is the one for the default server/service (any Tidepool service)
+	serverSecret, found := os.LookupEnv("SERVER_SECRET")
+	if found {
+		config.User.ServerSecrets["default"] = serverSecret
+	}
+
+	userSecret, found := os.LookupEnv("API_SECRET")
+	if found {
+		config.User.Secret = userSecret
+	}
+
+	mailchimpAPIKey, found := os.LookupEnv("MAILCHIMP_APIKEY")
+	if found {
+		config.User.Mailchimp.APIKey = mailchimpAPIKey
+	}
+
+	longTermKey, found := os.LookupEnv("LONG_TERM_KEY")
+	if found {
+		config.User.LongTermKey = longTermKey
+	}
+
+	verificationSecret, found := os.LookupEnv("VERIFICATION_SECRET")
+	if found {
+		config.User.VerificationSecret = verificationSecret
+	}
+
+	clinicLists, found := os.LookupEnv("CLINIC_LISTS")
+	if found {
+		if err := json.Unmarshal([]byte(clinicLists), &config.User.Mailchimp.ClinicLists); err != nil {
+			log.Panic("Problem loading clinic lists", err)
+		}
+	}
+
+	personalLists, found := os.LookupEnv("PERSONAL_LISTS")
+	if found {
+		if err := json.Unmarshal([]byte(personalLists), &config.User.Mailchimp.PersonalLists); err != nil {
+			log.Panic("Problem loading personal lists", err)
+		}
+	}
+
+	clinicDemoUserID, found := os.LookupEnv("DEMO_CLINIC_USER_ID")
+	if found {
+		config.User.ClinicDemoUserID = clinicDemoUserID
+	}
+
+	mailChimpURL, found := os.LookupEnv("MAILCHIMP_URL")
+	if found {
+		config.User.Mailchimp.URL = mailChimpURL
+	}
+
+	salt, found := os.LookupEnv("SALT")
+	if found {
+		config.User.Salt = salt
+	}
+
+	config.Mongo.FromEnv()
+
 	/*
 	 * Hakken setup
 	 */
@@ -65,10 +128,14 @@ func main() {
 		WithConfig(&config.HakkenConfig).
 		Build()
 
-	if err := hakkenClient.Start(); err != nil {
-		log.Fatal(shoreline_service_prefix, err)
+	if !config.HakkenConfig.SkipHakken {
+		if err := hakkenClient.Start(); err != nil {
+			log.Fatal(shoreline_service_prefix, err)
+		}
+		defer hakkenClient.Close()
+	} else {
+		log.Print("skipping hakken service")
 	}
-	defer hakkenClient.Close()
 
 	/*
 	 * Clients
@@ -92,7 +159,7 @@ func main() {
 	 * User-Api setup
 	 */
 
-	log.Print(shoreline_service_prefix, "adding", user.USER_API_PREFIX)
+	log.Print(shoreline_service_prefix, "adding ", user.USER_API_PREFIX)
 
 	userapi := user.InitApi(config.User, user.NewMongoStoreClient(&config.Mongo), highwater)
 	userapi.SetHandlers("", rtr)
@@ -105,14 +172,14 @@ func main() {
 		WithTokenProvider(userClient).
 		Build()
 
-	log.Print(shoreline_service_prefix, "adding", "permsClient")
+	log.Print(shoreline_service_prefix, "adding ", "permsClient")
 	userapi.AttachPerms(permsClient)
 
 	/*
 	 * Oauth setup
 	 */
 
-	log.Print(shoreline_service_prefix, "adding", oauth2.OAUTH2_API_PREFIX)
+	log.Print(shoreline_service_prefix, "adding ", oauth2.OAUTH2_API_PREFIX)
 
 	oauthapi := oauth2.InitApi(config.Oauth2, oauth2.NewOAuthStorage(&config.Mongo), userClient, permsClient)
 	oauthapi.SetHandlers("", rtr)
