@@ -307,7 +307,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 // @ID shoreline-user-api-updateuser
 // @Accept  json
 // @Produce  json
-// @Param userid path int false "user id"
+// @Param userid path int true "user id"
 // @Param user body user.UpdateUserDetails true "user update details"
 // @Security TidepoolAuth
 // @Success 200 {object} user.UpdateUserDetails
@@ -418,7 +418,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @ID shoreline-user-api-getuserinfo
 // @Accept  json
 // @Produce  json
-// @Param userid path int false "user id"
+// @Param userid path int true "user id"
 // @Security TidepoolAuth
 // @Success 200 {object} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -467,13 +467,13 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @ID shoreline-user-api-deleteuser
 // @Accept  json
 // @Produce  json
-// @Param userid path int false "user id"
+// @Param userid path int true "user id"
 // @Param password body string true "password"
 // @Security TidepoolAuth
 // @Success 202
-// @Failure 500
+// @Failure 500 {string} string ""
 // @Failure 403 {object} status.Status "message returned:\"Missing id and/or password\" "
-// @Failure 401
+// @Failure 401 {string} string ""
 // @Router /user/{userid} [delete]
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 
@@ -626,7 +626,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Produce  json
 // @Success 200 {string} string  "generic json format { \"oauthUser\" : fndUsr, \"oauthTarget\" : result[\"authUserId\"] }"
 // @Header 200 {string} x-tidepool-session-token "qwerty"
-// @Failure 503
+// @Failure 503 {string} string ""
 // @Failure 401 {string} string "generic json format { \"error\" : errorMsg }"
 // @Failure 400 {string} string "generic json format { \"error\" : errorMsg }"
 // @Router /oauthlogin [post]
@@ -696,7 +696,7 @@ func (a *Api) oauth2Login(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} user.TokenData  "Token details"
 // @Header 200 {string} x-tidepool-session-token "qwerty"
 // @Failure 500 {object} status.Status "message returned:\"Error generating the token\" "
-// @Failure 401
+// @Failure 401 {string} string ""
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 
@@ -800,7 +800,7 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Accept  json
 // @Produce  json
 // @Param x-tidepool-session-token header string false "api session token"
-// @Success 200
+// @Success 200 {string} string ""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 	if id := req.Header.Get(TP_SESSION_TOKEN); id != "" {
@@ -819,7 +819,7 @@ func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 // @ID shoreline-user-api-anonymousidhashpair
 // @Accept  json
 // @Produce  json
-// @Success 200 {objetc} user.AnonIdHashPair "AnonymousIdHashPair?"
+// @Success 200 {object} user.AnonIdHashPair "AnonymousIdHashPair?"
 // @Router /private [get]
 func (a *Api) AnonymousIdHashPair(res http.ResponseWriter, req *http.Request) {
 	idHashPair := NewAnonIdHashPair([]string{a.ApiConfig.Salt}, req.URL.Query())
