@@ -196,12 +196,13 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @ID shoreline-user-api-getusers
 // @Accept  json
 // @Produce  json
-// @Param role query string true "Role" Enums(clinic)
+// @Param role query string false "Role" Enums(clinic)
+// @Param id query string false "List of UserId separated by ,"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
-// @Failure 401 {object} status.Status "message returned:\"The role specified is invalid\" or \"A query must be specified\" "
-// @Failure 400 {object} status.Status "message returned:\"Not authorized for requested operation\" "
+// @Failure 400 {object} status.Status "message returned:\"The role specified is invalid\" or \"A query must be specified\" or \"Only one query parameter is allowed\" or \"Unknown query parameter\""
+// @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\" "
 // @Router /users [get]
 func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	sessionToken := req.Header.Get(TP_SESSION_TOKEN)
@@ -246,7 +247,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 // @Produce  json
 // @Param user body user.NewUserDetails true "user details"
 // @Success 201 {object} user.User
-// @Header 201 {string} x-tidepool-session-token "qwerty"
+// @Header 201 {string} x-tidepool-session-token "authentication token"
 // @Failure 500 {object} status.Status "message returned:\"Error creating the user\" or \"Error generating the token\" "
 // @Failure 409 {object} status.Status "message returned:\"User already exists\" "
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
@@ -297,7 +298,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 // @ID shoreline-user-api-createcustodialuser
 // @Accept  json
 // @Produce  json
-// @Param userid path int true "user id"
+// @Param userid path int true "custodian user id"
 // @Param user body user.NewCustodialUserDetails true "user custodial details"
 // @Security TidepoolAuth
 // @Success 201 {object} user.User
@@ -460,7 +461,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @ID shoreline-user-api-getuserinfo
 // @Accept  json
 // @Produce  json
-// @Param userid path int true "user id"
+// @Param userid path int true "user id" optional
 // @Security TidepoolAuth
 // @Success 200 {object} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -509,7 +510,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @ID shoreline-user-api-deleteuser
 // @Accept  json
 // @Produce  json
-// @Param userid path int true "user id"
+// @Param userid path int true "user id for server request, from token for personal request" optional
 // @Param password body string true "password"
 // @Security TidepoolAuth
 // @Success 202
@@ -576,7 +577,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Param tokenduration header number false "token duration"
 // @Security BasicAuth
 // @Success 200 {object} user.User
-// @Header 200 {string} x-tidepool-session-token "qwerty"
+// @Header 200 {string} x-tidepool-session-token "au"
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" or \"Error updating token\" "
 // @Failure 403 {object} status.Status "message returned:\"The user hasn't verified this account yet\" "
 // @Failure 401 {object} status.Status "message returned:\"No user matched the given details\" "
@@ -626,8 +627,8 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 // @Param x-tidepool-server-name header string true "server name"
 // @Param x-tidepool-server-secret header string true "server secret"
 // @Success 200
-// @Header 200 {string} x-tidepool-session-token "qwerty"
-// @Failure 500 {object} status.Status "message returned:\"Error generating the token\" "
+// @Header 200 {string} x-tidepool-session-token "authentication token"
+// @Failure 500 {object} status.Status "message returned:\"Error generating the token\" or \"No expected password is found\""
 // @Failure 401 {object} status.Status "message returned:\"Wrong password\" "
 // @Failure 400 {object} status.Status "message returned:\"Missing id and/or password\" "
 // @Router /serverlogin [post]
@@ -695,7 +696,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {string} string  "generic json format { \"oauthUser\" : fndUsr, \"oauthTarget\" : result[\"authUserId\"] }"
-// @Header 200 {string} x-tidepool-session-token "qwerty"
+// @Header 200 {string} x-tidepool-session-token "authentication token"
 // @Failure 503 {string} string ""
 // @Failure 401 {string} string "generic json format { \"error\" : errorMsg }"
 // @Failure 400 {string} string "generic json format { \"error\" : errorMsg }"
@@ -764,7 +765,7 @@ func (a *Api) oauth2Login(w http.ResponseWriter, r *http.Request) {
 // @Param x-tidepool-server-secret header string true "server secret"
 // @Security TidepoolAuth
 // @Success 200 {object} user.TokenData  "Token details"
-// @Header 200 {string} x-tidepool-session-token "qwerty"
+// @Header 200 {string} x-tidepool-session-token "authentication token"
 // @Failure 500 {object} status.Status "message returned:\"Error generating the token\" "
 // @Failure 401 {string} string ""
 // @Router /login [get]
@@ -808,7 +809,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 // @Param longtermkey path string true "long term key"
 // @Security BasicAuth
 // @Success 200 {object} user.User
-// @Header 200 {string} x-tidepool-session-token "qwerty"
+// @Header 200 {string} x-tidepool-session-token "authentication token"
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" or \"Error updating token\" "
 // @Failure 403 {object} status.Status "message returned:\"The user hasn't verified this account yet\" "
 // @Failure 401 {object} status.Status "message returned:\"No user matched the given details\" "
@@ -841,7 +842,6 @@ func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map
 // @ID shoreline-user-api-serverchecktoken
 // @Accept  json
 // @Produce  json
-// @Param token path string true "server token"
 // @Security TidepoolAuth
 // @Success 200 {object} user.TokenData  "Token details"
 // @Failure 401 {object} status.Status "message returned:\"No x-tidepool-session-token was found\" "
@@ -869,7 +869,7 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @ID shoreline-user-api-logout
 // @Accept  json
 // @Produce  json
-// @Param x-tidepool-session-token header string false "api session token"
+// @Security TidepoolAuth
 // @Success 200 {string} string ""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
