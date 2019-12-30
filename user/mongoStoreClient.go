@@ -89,19 +89,18 @@ func (d MongoStoreClient) FindUser(user *User) (result *User, err error) {
 	return result, nil
 }
 
-func (d MongoStoreClient) FindUsers(user *User) (results []*User, err error) {
+func (d MongoStoreClient) FindUsers(user *User, match string) (results []*User, err error) {
 
 	fieldsToMatch := []bson.M{}
-	const (
-		MATCH = `^%s$`
-	)
-
+	if match == "" {
+		match = `%s`
+	}
 	if user.Id != "" {
 		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.Id})
 	}
 	if user.Username != "" {
 		//case insensitive match
-		fieldsToMatch = append(fieldsToMatch, bson.M{"username": bson.M{"$regex": bson.RegEx{fmt.Sprintf(MATCH, regexp.QuoteMeta(user.Username)), "i"}}})
+		fieldsToMatch = append(fieldsToMatch, bson.M{"username": bson.M{"$regex": bson.RegEx{fmt.Sprintf(match, regexp.QuoteMeta(user.Username)), "i"}}})
 	}
 	if len(user.Emails) > 0 {
 		fieldsToMatch = append(fieldsToMatch, bson.M{"emails": bson.M{"$in": user.Emails}})

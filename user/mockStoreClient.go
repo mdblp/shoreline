@@ -28,7 +28,7 @@ func (d MockStoreClient) UpsertUser(user *User) error {
 	return nil
 }
 
-func (d MockStoreClient) FindUsers(user *User) (found []*User, err error) {
+func (d MockStoreClient) FindUsers(user *User, match string) (found []*User, err error) {
 	//`find` a pretend one we just made
 
 	if d.doBad {

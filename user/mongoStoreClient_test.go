@@ -62,7 +62,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 
 	toFindByOriginalName := &User{Username: user.Username}
 
-	if found, err := mc.FindUsers(toFindByOriginalName); err != nil {
+	if found, err := mc.FindUsers(toFindByOriginalName, ""); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
 		if len(found) > 0 && found[0].Username != toFindByOriginalName.Username && found[0].Username != *original_user_detail.Username {
@@ -72,7 +72,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	//UPPER CASE
 	byUpperName := &User{Username: strings.ToUpper(user.Username)}
 
-	if found, err := mc.FindUsers(byUpperName); err != nil {
+	if found, err := mc.FindUsers(byUpperName, ""); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
 		if len(found) == 0 {
@@ -84,7 +84,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	//lower case
 	byLowerName := &User{Username: strings.ToLower(user.Username)}
 
-	if found, err := mc.FindUsers(byLowerName); err != nil {
+	if found, err := mc.FindUsers(byLowerName, ""); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
 		if len(found) == 0 {
@@ -104,7 +104,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	//By Username
 	toFindByName := &User{Username: user.Username}
 
-	if found, err := mc.FindUsers(toFindByName); err != nil {
+	if found, err := mc.FindUsers(toFindByName, ""); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
 		if len(found) != 1 {
@@ -123,7 +123,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	//By Email
 	byEmails := &User{Emails: user.Emails}
 
-	if found, err := mc.FindUsers(byEmails); err != nil {
+	if found, err := mc.FindUsers(byEmails, ""); err != nil {
 		t.Fatalf("we could not find the the user by emails %v", byEmails)
 	} else {
 		if len(found) != 1 {
@@ -158,7 +158,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 
 	toMultipleByEmails := &User{Emails: user.Emails}
 
-	if found, err := mc.FindUsers(toMultipleByEmails); err != nil {
+	if found, err := mc.FindUsers(toMultipleByEmails, ""); err != nil {
 		t.Fatalf("we could not find the the users by emails %v", toMultipleByEmails)
 	} else if len(found) != 2 {
 		t.Logf("results: %v ", found)

@@ -5,7 +5,7 @@ type Storage interface {
 	Ping() error
 	UpsertUser(user *User) error
 	FindUser(user *User) (*User, error)
-	FindUsers(user *User) ([]*User, error)
+	FindUsers(user *User, match string) ([]*User, error)
 	FindUsersByRole(role string) ([]*User, error)
 	FindUsersWithIds(role []string) ([]*User, error)
 	RemoveUser(user *User) error

@@ -198,6 +198,8 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @Produce  json
 // @Param role query string false "Role" Enums(clinic)
 // @Param id query string false "List of UserId separated by ,"
+// @Param user query string false "pattern for matching username, can be combined with match parameter"
+// @Param match query string false "matching pattern used with user parameter, this is a regular expression matching where %s is the value passed in user parameter"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -222,6 +224,9 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
 
 	} else {
+		var user = &User{}
+		user.Username = req.URL.Query().Get("user")
+		var match = req.URL.Query().Get("match")
 		var users []*User
 		switch {
 		case role != "":
@@ -230,6 +235,10 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 			}
 		case len(userIds[0]) > 0:
 			if users, err = a.Store.FindUsersWithIds(userIds); err != nil {
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
+			}
+		case user.Username != "":
+			if users, err = a.Store.FindUsers(user, match); err != nil {
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
 			}
 		default:
@@ -262,7 +271,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
-	} else if existingUser, err := a.Store.FindUsers(newUser); err != nil {
+	} else if existingUser, err := a.Store.FindUsers(newUser, ""); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingUser) != 0 {
@@ -321,7 +330,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 	} else if newCustodialUser, err := NewCustodialUser(newCustodialUserDetails, a.ApiConfig.Salt); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
-	} else if existingCustodialUser, err := a.Store.FindUsers(newCustodialUser); err != nil {
+	} else if existingCustodialUser, err := a.Store.FindUsers(newCustodialUser, ""); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingCustodialUser) != 0 {
@@ -400,7 +409,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				dupCheck.Emails = updatedUser.Emails
 			}
 
-			if results, err := a.Store.FindUsers(dupCheck); err != nil {
+			if results, err := a.Store.FindUsers(dupCheck, ""); err != nil {
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 				return
 			} else if len(results) == 1 && results[0].Id != firstStringNotEmpty(vars["userid"], tokenData.UserId) {
@@ -480,7 +489,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			user = &User{Id: tokenData.UserId}
 		}
 
-		if results, err := a.Store.FindUsers(user); err != nil {
+		if results, err := a.Store.FindUsers(user, ""); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 		} else if len(results) == 0 {
@@ -587,7 +596,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	if user, password := unpackAuth(req.Header.Get("Authorization")); user == nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
 
-	} else if results, err := a.Store.FindUsers(user); err != nil {
+	} else if results, err := a.Store.FindUsers(user, ""); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 	} else if len(results) != 1 {
@@ -869,7 +878,7 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @ID shoreline-user-api-logout
 // @Accept  json
 // @Produce  json
-// @Security TidepoolAuth
+// @Param x-tidepool-session-token header string false "api session token"
 // @Success 200 {string} string ""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
