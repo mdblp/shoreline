@@ -2,10 +2,16 @@ package user
 
 import (
 	"encoding/base64"
+	"container/list"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
+)
+
+const (
+	// maxConcurrentLogin Maximum number of concurrent login (TODO: Make this constant as a parameter)
+	maxConcurrentLogin int = 100
 )
 
 func firstStringNotEmpty(strs ...string) string {
@@ -39,7 +45,7 @@ func unpackAuth(authLine string) (usr *User, pw string) {
 			log.Print(USER_API_PREFIX, "Error unpacking authorization header [%s]", err.Error())
 		} else {
 			details := strings.SplitN(string(decodedPayload), ":", 2)
-			if details[0] != "" || details[1] != "" {
+			if IsValidEmail(details[0]) && IsValidPassword(details[1]) {
 				//Note the incoming `name` could infact be id, email or the username
 				return &User{Id: details[0], Username: details[0], Emails: []string{details[0]}}, details[1]
 			}
@@ -141,4 +147,35 @@ func (a *Api) asSerializableUser(user *User, isServerRequest bool) interface{} {
 		serializable["passwordExists"] = (user.PwHash != "")
 	}
 	return serializable
+}
+
+func (a *Api) appendUserLoginInProgress(user *User) (code int, elem *list.Element) {
+	a.loginLimiter.mutex.Lock()
+	defer a.loginLimiter.mutex.Unlock()
+
+	// Simple rate limiter
+	a.loginLimiter.nInProgress++
+	if a.loginLimiter.nInProgress > maxConcurrentLogin {
+		return http.StatusTooManyRequests, nil
+	}
+
+	for e := a.loginLimiter.userNamesInProgress.Front(); e != nil; e = e.Next() {
+		if (e.Value.(User).Username == user.Username) {
+			return http.StatusTooManyRequests, nil
+		}
+	}
+
+	e := a.loginLimiter.userNamesInProgress.PushBack(user)
+	return http.StatusOK, e
+}
+
+func (a *Api) removeUserLoginInProgress(elem *list.Element) {
+	a.loginLimiter.mutex.Lock()
+
+	a.loginLimiter.nInProgress--
+
+	if elem != nil {
+		a.loginLimiter.userNamesInProgress.Remove(elem)
+	}
+	a.loginLimiter.mutex.Unlock()
 }

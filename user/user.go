@@ -19,12 +19,25 @@ type User struct {
 	PwHash         string                 `json:"-" bson:"pwhash,omitempty"`
 	Hash           string                 `json:"-" bson:"userhash,omitempty"`
 	Private        map[string]*IdHashPair `json:"-" bson:"private"`
+	FailedLogin    *FailedLoginInfos      `json:"-" bson:"failedLogin,omitempty"`
 	CreatedTime    string                 `json:"createdTime,omitempty" bson:"createdTime,omitempty"`
 	CreatedUserID  string                 `json:"createdUserId,omitempty" bson:"createdUserId,omitempty"`
 	ModifiedTime   string                 `json:"modifiedTime,omitempty" bson:"modifiedTime,omitempty"`
 	ModifiedUserID string                 `json:"modifiedUserId,omitempty" bson:"modifiedUserId,omitempty"`
 	DeletedTime    string                 `json:"deletedTime,omitempty" bson:"deletedTime,omitempty"`
 	DeletedUserID  string                 `json:"deletedUserId,omitempty" bson:"deletedUserId,omitempty"`
+}
+
+// FailedLoginInfos monitor the failed login of an user account.
+type FailedLoginInfos struct {
+	// Count is the current number of failed login since previous success (reset to 0 after each successful login)
+	Count int `json:"-" bson:"count"`
+	// Total number of failed login attempt (this value is never reset to 0)
+	Total int `json:"-" bson:"total"`
+	// Last time we had a failed login attempt
+	LastFailedTime string `json:"-" bson:"lastTime,omitempty"`
+	// Next time we may consider a valid login attempt on this account
+	NextLoginAttemptTime string `json:"-" bson:"nextLoginAttemptTime,omitempty"`
 }
 
 /*
@@ -50,6 +63,15 @@ type UpdateUserDetails struct {
 	TermsAccepted *string
 	EmailVerified *bool
 }
+
+const (
+	// Maximum number of consecutive failed login before a delai is set (TODO: Make this constant as a parameter?)
+	maxFailedLogin int = 3
+	// User must wait 10min before attempting a new login if the number of
+	// consecutive failed login is more than maxFailedLogin
+	// (TODO: Make this constant as a parameter?)
+	delayToAllowNewLoginAttempt = time.Minute * 10
+)
 
 var (
 	User_error_details_missing        = errors.New("User details are missing")
@@ -515,5 +537,30 @@ func (u *User) DeepClone() *User {
 			clonedUser.Private[k] = &IdHashPair{Id: v.Id, Hash: v.Hash}
 		}
 	}
+	if u.FailedLogin != nil {
+		clonedUser.FailedLogin = &FailedLoginInfos{
+			Count: u.FailedLogin.Count,
+			Total: u.FailedLogin.Total,
+			LastFailedTime: u.FailedLogin.LastFailedTime,
+			NextLoginAttemptTime: u.FailedLogin.NextLoginAttemptTime,
+		}
+	}
 	return clonedUser
+}
+
+// CanPerformALogin check if the user can do a login
+func (u *User) CanPerformALogin() bool {
+	if u.FailedLogin == nil {
+		return true
+	}
+	if u.FailedLogin.Count < maxFailedLogin {
+		return true
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	if u.FailedLogin.NextLoginAttemptTime < now {
+		return true
+	}
+
+	return false
 }

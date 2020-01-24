@@ -1,6 +1,7 @@
 package user
 
 import (
+	"container/list"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -32,6 +34,7 @@ type (
 		oauth            oauth2.Client
 		logger           *log.Logger
 		mailchimpManager mailchimp.Manager
+		loginLimiter     LoginLimiter
 	}
 	Secret struct {
 		Secret string `json:"secret"`
@@ -54,6 +57,12 @@ type (
 		VerificationSecret string           `json:"verificationSecret"`
 		ClinicDemoUserID   string           `json:"clinicDemoUserId"`
 		Mailchimp          mailchimp.Config `json:"mailchimp"`
+	}
+	// LoginLimiter var needed to limit the max login attempt on an account
+	LoginLimiter struct {
+		mutex               sync.Mutex
+		userNamesInProgress *list.List
+		nInProgress         int
 	}
 	varsHandler func(http.ResponseWriter, *http.Request, map[string]string)
 )
@@ -95,6 +104,8 @@ const (
 	STATUS_INVALID_ROLE          = "The role specified is invalid"
 	STATUS_OK                    = "OK"
 	STATUS_NO_EXPECTED_PWD       = "No expected password is found"
+	STATUS_TOO_EARLY             = "Request is too early"
+	STATUS_TOO_MANY_REQUESTS     = "Too many requests"
 )
 
 func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
@@ -112,13 +123,17 @@ func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
 		cfg.ServerSecrets[sec.Secret] = sec.Pass
 	}
 
-	return &Api{
+	api := Api{
 		Store:            store,
 		ApiConfig:        cfg,
 		metrics:          metrics,
 		logger:           logger,
 		mailchimpManager: mailchimpManager,
 	}
+
+	api.loginLimiter.userNamesInProgress = list.New()
+
+	return &api
 }
 
 func (a *Api) AttachPerms(perms clients.Gatekeeper) {
@@ -582,10 +597,20 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Failure 403 {object} status.Status "message returned:\"The user hasn't verified this account yet\" "
 // @Failure 401 {object} status.Status "message returned:\"No user matched the given details\" "
 // @Failure 400 {object} status.Status "message returned:\"Missing id and/or password\" "
+// @Failure 425 {object} status.Status "message returned:\"Too early\" "
+// @Failure 429 {object} status.Status "message returned:\"Too many requests\" "
 // @Router /login [post]
 func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
-	if user, password := unpackAuth(req.Header.Get("Authorization")); user == nil {
+	user, password := unpackAuth(req.Header.Get("Authorization"))
+	if user == nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
+		return
+	}
+
+	code, elem := a.appendUserLoginInProgress(user)
+	defer a.removeUserLoginInProgress(elem)
+	if code != http.StatusOK {
+		a.sendError(res, code, STATUS_TOO_MANY_REQUESTS, fmt.Sprintf("Too many ongoing login (%d), refused for %s", a.loginLimiter.nInProgress, user.Username))
 
 	} else if results, err := a.Store.FindUsers(user); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
@@ -599,7 +624,14 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	} else if result.IsDeleted() {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, "User is marked deleted")
 
+	} else if !result.CanPerformALogin() {
+		a.sendError(res, http.StatusTooEarly, STATUS_TOO_EARLY, fmt.Sprintf("User %s can't perform a login yet", result.Username))
+
 	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
+		// Limit login failed
+		if err := a.UpdateUserAfterFailedLogin(result); err != nil {
+			a.logger.Printf("Failed to save failed login status [%s] for user %#v", err.Error(), result)
+		}
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, "Passwords do not match")
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
@@ -615,6 +647,10 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 			a.logMetric("userlogin", sessionToken.ID, nil)
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			a.sendUser(res, result, false)
+		}
+
+		if err := a.UpdateUserAfterSuccessfulLogin(result); err != nil {
+			a.logger.Printf("Failed to save success login status [%s] for user %#v", err.Error(), result)
 		}
 	}
 }
@@ -965,4 +1001,29 @@ func (a *Api) removeUserPermissions(groupId string, removePermissions clients.Pe
 		}
 		return nil
 	}
+}
+
+// UpdateUserAfterFailedLogin update the user failed login infos in database
+func (a *Api) UpdateUserAfterFailedLogin(u *User) error {
+	if u.FailedLogin == nil {
+		u.FailedLogin = new(FailedLoginInfos)
+	}
+	u.FailedLogin.Count++
+	u.FailedLogin.Total++
+	now := time.Now()
+	u.FailedLogin.LastFailedTime = now.Format(time.RFC3339)
+	if u.FailedLogin.Count >= maxFailedLogin {
+		nextAttemptTime := now.Add(delayToAllowNewLoginAttempt)
+		u.FailedLogin.NextLoginAttemptTime = nextAttemptTime.Format(time.RFC3339)
+	}
+	return a.Store.UpsertUser(u)
+}
+
+// UpdateUserAfterSuccessfulLogin update the user after a successful login
+func (a *Api) UpdateUserAfterSuccessfulLogin(u *User) error {
+	if u.FailedLogin != nil && u.FailedLogin.Count > 0 {
+		u.FailedLogin.Count = 0
+		return a.Store.UpsertUser(u)
+	}
+	return nil
 }
