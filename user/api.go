@@ -86,7 +86,6 @@ const (
 	STATUS_ERR_GENERATING_TOKEN  = "Error generating the token"
 	STATUS_ERR_UPDATING_TOKEN    = "Error updating token"
 	STATUS_MISSING_USR_DETAILS   = "Not all required details were given"
-	STATUS_ERROR_UPDATING_PW     = "Error updating password"
 	STATUS_MISSING_ID_PW         = "Missing id and/or password"
 	STATUS_NO_MATCH              = "No user matched the given details"
 	STATUS_NOT_VERIFIED          = "The user hasn't verified this account yet"
@@ -105,8 +104,6 @@ const (
 	STATUS_INVALID_ROLE          = "The role specified is invalid"
 	STATUS_OK                    = "OK"
 	STATUS_NO_EXPECTED_PWD       = "No expected password is found"
-	STATUS_TOO_EARLY             = "Request is too early"
-	STATUS_TOO_MANY_REQUESTS     = "Too many requests"
 )
 
 func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
@@ -265,7 +262,6 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 // @Success 201 {object} user.User
 // @Header 201 {string} x-tidepool-session-token "authentication token"
 // @Failure 500 {object} status.Status "message returned:\"Error creating the user\" or \"Error generating the token\" "
-// @Failure 409 {object} status.Status "message returned:\"User already exists\" "
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
 // @Router /user [post]
 func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
@@ -282,7 +278,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingUser) != 0 {
-		a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS)
+		a.sendError(res, http.StatusConflict, STATUS_ERR_CREATING_USR, STATUS_USR_ALREADY_EXISTS)
 
 	} else if err := a.Store.UpsertUser(newUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
@@ -594,12 +590,10 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Security BasicAuth
 // @Success 200 {object} user.User
 // @Header 200 {string} x-tidepool-session-token "au"
-// @Failure 500 {object} status.Status "message returned:\"Error finding user\" or \"Error updating token\" "
-// @Failure 403 {object} status.Status "message returned:\"The user hasn't verified this account yet\" "
-// @Failure 401 {object} status.Status "message returned:\"No user matched the given details\" "
-// @Failure 400 {object} status.Status "message returned:\"Missing id and/or password\" "
-// @Failure 425 {object} status.Status "message returned:\"Too early\" "
-// @Failure 429 {object} status.Status "message returned:\"Too many requests\" "
+// @Failure 500 {object} status.Status "message returned: \"Error updating token\""
+// @Failure 403 {object} status.Status "message returned: \"The user hasn't verified this account yet\""
+// @Failure 401 {object} status.Status "message returned: \"No user matched the given details\""
+// @Failure 400 {object} status.Status "message returned: \"Missing id and/or password\""
 // @Router /login [post]
 func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	user, password := unpackAuth(req.Header.Get("Authorization"))
@@ -608,35 +602,35 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Random sleep to avoid guessing accounts login.
+	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)))
 
 	code, elem := a.appendUserLoginInProgress(user)
 	defer a.removeUserLoginInProgress(elem)
 	if code != http.StatusOK {
-		a.sendError(res, code, STATUS_TOO_MANY_REQUESTS, fmt.Sprintf("Too many ongoing login (%d), refused for %s", a.loginLimiter.nInProgress, user.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.nInProgress))
 
 	} else if results, err := a.Store.FindUsers(user); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, STATUS_USER_NOT_FOUND, err)
 
 	} else if len(results) != 1 {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("Found %d users matching %#v", len(results), user))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' have %d matching results", user.Username, len(results)))
 
 	} else if result := results[0]; result == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, "Found user is nil")
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is nil", user.Username))
 
 	} else if result.IsDeleted() {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, "User is marked deleted")
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is marked deleted", user.Username))
 
 	} else if !result.CanPerformALogin() {
-		a.sendError(res, http.StatusTooEarly, STATUS_TOO_EARLY, fmt.Sprintf("User %s can't perform a login yet", result.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", result.Username))
 
 	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
 		// Limit login failed
 		if err := a.UpdateUserAfterFailedLogin(result); err != nil {
 			a.logger.Printf("Failed to save failed login status [%s] for user %#v", err.Error(), result)
 		}
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, "Passwords do not match")
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' passwords do not match", result.Username))
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
 		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)
