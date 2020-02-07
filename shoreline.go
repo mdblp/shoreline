@@ -21,10 +21,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -54,6 +56,9 @@ const (
 
 func main() {
 	var config Config
+
+	// Init random number generator
+	rand.Seed(time.Now().UnixNano())
 
 	if err := common.LoadEnvironmentConfig([]string{"TIDEPOOL_SHORELINE_ENV", "TIDEPOOL_SHORELINE_SERVICE"}, &config); err != nil {
 		log.Panic("Problem loading config", err)

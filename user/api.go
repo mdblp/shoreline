@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"reflect"
@@ -606,6 +607,9 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
 		return
 	}
+
+	// Random sleep to avoid guessing accounts login.
+	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)))
 
 	code, elem := a.appendUserLoginInProgress(user)
 	defer a.removeUserLoginInProgress(elem)
