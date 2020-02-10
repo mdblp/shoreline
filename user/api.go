@@ -623,14 +623,14 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is marked deleted", user.Username))
 
 	} else if !result.CanPerformALogin() {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", result.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", user.Username))
 
 	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
 		// Limit login failed
 		if err := a.UpdateUserAfterFailedLogin(result); err != nil {
-			a.logger.Printf("Failed to save failed login status [%s] for user %#v", err.Error(), result)
+			a.logger.Printf("User '%s' failed to save failed login status [%s]", user.Username, err.Error())
 		}
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' passwords do not match", result.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' passwords do not match", user.Username))
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
 		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)

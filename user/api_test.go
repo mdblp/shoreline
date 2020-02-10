@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/tidepool-org/go-common/clients"
@@ -1349,6 +1350,7 @@ func Test_Login_Error_FindUsersNil(t *testing.T) {
 func Test_Login_Error_NoPassword(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1360,6 +1362,30 @@ func Test_Login_Error_NoPassword(t *testing.T) {
 func Test_Login_Error_PasswordMismatch(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "MISMATCH")
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.UpsertUserResponses = []error{nil}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add("Authorization", authorization)
+	response := T_PerformRequestHeaders(t, "POST", "/login", headers)
+	T_ExpectErrorResponse(t, response, 401, "No user matched the given details")
+}
+
+func Test_Login_Error_AccountLock(t *testing.T) {
+	authorization := T_CreateAuthorization(t, "a@b.co", "password")
+	now := time.Now()
+	nextAttemptTime := now.Add(delayToAllowNewLoginAttempt)
+	user := User{
+		Id:     "1111111111",
+		PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5",
+		FailedLogin: &FailedLoginInfos{
+			Count:                3,
+			Total:                3,
+			LastFailedTime:       now.Format(time.RFC3339),
+			NextLoginAttemptTime: nextAttemptTime.Format(time.RFC3339),
+		},
+	}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&user}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1782,6 +1808,7 @@ func Test_LongTermLogin_Error_FindUsersNil(t *testing.T) {
 func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1793,6 +1820,7 @@ func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 func Test_LongTermLogin_Error_PasswordMismatch(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "MISMATCH")
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
