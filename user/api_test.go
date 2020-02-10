@@ -503,7 +503,7 @@ func Test_CreateUser_Error_ConflictingEmail(t *testing.T) {
 
 	body := "{\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"password\": \"12345678\"}"
 	response := T_PerformRequestBody(t, "POST", "/user", body)
-	T_ExpectErrorResponse(t, response, 409, "User already exists")
+	T_ExpectErrorResponse(t, response, 500, "Error creating the user")
 }
 
 func Test_CreateUser_Error_ErrorUpsertingUser(t *testing.T) {
@@ -1322,7 +1322,7 @@ func Test_Login_Error_FindUsersError(t *testing.T) {
 	headers := http.Header{}
 	headers.Add("Authorization", authorization)
 	response := T_PerformRequestHeaders(t, "POST", "/login", headers)
-	T_ExpectErrorResponse(t, response, 500, "Error finding user")
+	T_ExpectErrorResponse(t, response, http.StatusUnauthorized, STATUS_NO_MATCH)
 }
 
 func Test_Login_Error_FindUsersMissing(t *testing.T) {
@@ -1780,7 +1780,7 @@ func Test_LongTermLogin_Error_FindUsersError(t *testing.T) {
 	headers := http.Header{}
 	headers.Add("Authorization", authorization)
 	response := T_PerformRequestHeaders(t, "POST", "/login/thelongtermkey", headers)
-	T_ExpectErrorResponse(t, response, 500, "Error finding user")
+	T_ExpectErrorResponse(t, response, http.StatusUnauthorized, STATUS_NO_MATCH)
 }
 
 func Test_LongTermLogin_Error_FindUsersMissing(t *testing.T) {

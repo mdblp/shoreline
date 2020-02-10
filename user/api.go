@@ -265,6 +265,9 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
 // @Router /user [post]
 func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
+	// Random sleep to avoid guessing accounts user.
+	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(300)))
+
 	if newUserDetails, err := ParseNewUserDetails(req.Body); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
@@ -278,7 +281,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingUser) != 0 {
-		a.sendError(res, http.StatusConflict, STATUS_ERR_CREATING_USR, STATUS_USR_ALREADY_EXISTS)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, fmt.Sprintf("User '%s' already exists", *newUserDetails.Username))
 
 	} else if err := a.Store.UpsertUser(newUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
