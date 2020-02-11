@@ -40,7 +40,7 @@ func unpackAuth(authLine string) (usr *User, pw string) {
 			log.Print(USER_API_PREFIX, "Error unpacking authorization header [%s]", err.Error())
 		} else {
 			details := strings.SplitN(string(decodedPayload), ":", 2)
-			if (IsValidEmail(details[0]) || details[0] != "") && IsValidPassword(details[1]) {
+			if details[0] != "" || details[1] != "" {
 				//Note the incoming `name` could infact be id, email or the username
 				return &User{Id: details[0], Username: details[0], Emails: []string{details[0]}}, details[1]
 			}
