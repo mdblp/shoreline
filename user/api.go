@@ -54,6 +54,13 @@ type (
 		Salt string `json:"salt"`
 		//used for token
 		Secret string `json:"apiSecret"`
+		// Maximum number of consecutive failed login before a delay is set
+		MaxFailedLogin int `json:"maxFailedLogin"`
+		// Delay in minutes the user must wait 10min before attempting a new login if the number of
+		// consecutive failed login is more than MaxFailedLogin
+		DelayToAllowNewLoginAttempt int64 `json:"delayToAllowNewLoginAttempt"`
+		// Maximum number of concurrent login
+		MaxConcurrentLogin int `json:"maxConcurrentLogin"`
 		//allows for the skipping of verification for testing
 		VerificationSecret string           `json:"verificationSecret"`
 		ClinicDemoUserID   string           `json:"clinicDemoUserId"`
@@ -625,7 +632,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	} else if result.IsDeleted() {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is marked deleted", user.Username))
 
-	} else if !result.CanPerformALogin() {
+	} else if !result.CanPerformALogin(a.ApiConfig.MaxFailedLogin) {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", user.Username))
 
 	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
@@ -1013,8 +1020,8 @@ func (a *Api) UpdateUserAfterFailedLogin(u *User) error {
 	u.FailedLogin.Total++
 	now := time.Now()
 	u.FailedLogin.LastFailedTime = now.Format(time.RFC3339)
-	if u.FailedLogin.Count >= maxFailedLogin {
-		nextAttemptTime := now.Add(delayToAllowNewLoginAttempt)
+	if u.FailedLogin.Count >= a.ApiConfig.MaxFailedLogin {
+		nextAttemptTime := now.Add(time.Minute * time.Duration(a.ApiConfig.DelayToAllowNewLoginAttempt))
 		u.FailedLogin.NextLoginAttemptTime = nextAttemptTime.Format(time.RFC3339)
 	}
 	return a.Store.UpsertUser(u)

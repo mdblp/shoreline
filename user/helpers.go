@@ -1,17 +1,12 @@
 package user
 
 import (
-	"encoding/base64"
 	"container/list"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
-)
-
-const (
-	// maxConcurrentLogin Maximum number of concurrent login (TODO: Make this constant as a parameter)
-	maxConcurrentLogin int = 100
 )
 
 func firstStringNotEmpty(strs ...string) string {
@@ -155,12 +150,12 @@ func (a *Api) appendUserLoginInProgress(user *User) (code int, elem *list.Elemen
 
 	// Simple rate limiter
 	a.loginLimiter.nInProgress++
-	if a.loginLimiter.nInProgress > maxConcurrentLogin {
+	if a.loginLimiter.nInProgress > a.ApiConfig.MaxConcurrentLogin {
 		return http.StatusTooManyRequests, nil
 	}
 
 	for e := a.loginLimiter.userNamesInProgress.Front(); e != nil; e = e.Next() {
-		if (e.Value.(User).Username == user.Username) {
+		if e.Value.(User).Username == user.Username {
 			return http.StatusTooManyRequests, nil
 		}
 	}

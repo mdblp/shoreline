@@ -39,12 +39,15 @@ var (
 	FAKE_CONFIG    = ApiConfig{
 		Secrets: []Secret{Secret{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
 			Secret{Secret: "product_website", Pass: "Not so secret"}},
-		Secret:             "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
-		TokenDurationSecs:  TOKEN_DURATION,
-		LongTermKey:        "thelongtermkey",
-		Salt:               "a mineral substance composed primarily of sodium chloride",
-		VerificationSecret: "",
-		ClinicDemoUserID:   "00000000",
+		Secret:                      "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
+		TokenDurationSecs:           TOKEN_DURATION,
+		LongTermKey:                 "thelongtermkey",
+		Salt:                        "a mineral substance composed primarily of sodium chloride",
+		MaxFailedLogin:              5,
+		DelayToAllowNewLoginAttempt: 10,
+		MaxConcurrentLogin:          100,
+		VerificationSecret:          "",
+		ClinicDemoUserID:            "00000000",
 	}
 	/*
 	 * users and tokens
@@ -1374,13 +1377,13 @@ func Test_Login_Error_PasswordMismatch(t *testing.T) {
 func Test_Login_Error_AccountLock(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
 	now := time.Now()
-	nextAttemptTime := now.Add(delayToAllowNewLoginAttempt)
+	nextAttemptTime := now.Add(time.Minute * time.Duration(FAKE_CONFIG.DelayToAllowNewLoginAttempt))
 	user := User{
 		Id:     "1111111111",
 		PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5",
 		FailedLogin: &FailedLoginInfos{
-			Count:                3,
-			Total:                3,
+			Count:                5,
+			Total:                10,
 			LastFailedTime:       now.Format(time.RFC3339),
 			NextLoginAttemptTime: nextAttemptTime.Format(time.RFC3339),
 		},

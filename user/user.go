@@ -64,15 +64,6 @@ type UpdateUserDetails struct {
 	EmailVerified *bool
 }
 
-const (
-	// Maximum number of consecutive failed login before a delai is set (TODO: Make this constant as a parameter?)
-	maxFailedLogin int = 3
-	// User must wait 10min before attempting a new login if the number of
-	// consecutive failed login is more than maxFailedLogin
-	// (TODO: Make this constant as a parameter?)
-	delayToAllowNewLoginAttempt = time.Minute * 10
-)
-
 var (
 	User_error_details_missing        = errors.New("User details are missing")
 	User_error_username_missing       = errors.New("Username is missing")
@@ -539,9 +530,9 @@ func (u *User) DeepClone() *User {
 	}
 	if u.FailedLogin != nil {
 		clonedUser.FailedLogin = &FailedLoginInfos{
-			Count: u.FailedLogin.Count,
-			Total: u.FailedLogin.Total,
-			LastFailedTime: u.FailedLogin.LastFailedTime,
+			Count:                u.FailedLogin.Count,
+			Total:                u.FailedLogin.Total,
+			LastFailedTime:       u.FailedLogin.LastFailedTime,
 			NextLoginAttemptTime: u.FailedLogin.NextLoginAttemptTime,
 		}
 	}
@@ -549,7 +540,7 @@ func (u *User) DeepClone() *User {
 }
 
 // CanPerformALogin check if the user can do a login
-func (u *User) CanPerformALogin() bool {
+func (u *User) CanPerformALogin(maxFailedLogin int) bool {
 	if u.FailedLogin == nil {
 		return true
 	}
