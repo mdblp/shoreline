@@ -34,8 +34,6 @@ type FailedLoginInfos struct {
 	Count int `json:"-" bson:"count"`
 	// Total number of failed login attempt (this value is never reset to 0)
 	Total int `json:"-" bson:"total"`
-	// Last time we had a failed login attempt
-	LastFailedTime string `json:"-" bson:"lastTime,omitempty"`
 	// Next time we may consider a valid login attempt on this account
 	NextLoginAttemptTime string `json:"-" bson:"nextLoginAttemptTime,omitempty"`
 }
@@ -532,7 +530,6 @@ func (u *User) DeepClone() *User {
 		clonedUser.FailedLogin = &FailedLoginInfos{
 			Count:                u.FailedLogin.Count,
 			Total:                u.FailedLogin.Total,
-			LastFailedTime:       u.FailedLogin.LastFailedTime,
 			NextLoginAttemptTime: u.FailedLogin.NextLoginAttemptTime,
 		}
 	}

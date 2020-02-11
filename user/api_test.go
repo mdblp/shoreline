@@ -1376,15 +1376,13 @@ func Test_Login_Error_PasswordMismatch(t *testing.T) {
 
 func Test_Login_Error_AccountLock(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	now := time.Now()
-	nextAttemptTime := now.Add(time.Minute * time.Duration(FAKE_CONFIG.DelayToAllowNewLoginAttempt))
+	nextAttemptTime := time.Now().Add(time.Minute * time.Duration(FAKE_CONFIG.DelayToAllowNewLoginAttempt))
 	user := User{
 		Id:     "1111111111",
 		PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5",
 		FailedLogin: &FailedLoginInfos{
 			Count:                5,
 			Total:                10,
-			LastFailedTime:       now.Format(time.RFC3339),
 			NextLoginAttemptTime: nextAttemptTime.Format(time.RFC3339),
 		},
 	}

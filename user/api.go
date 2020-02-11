@@ -1018,10 +1018,8 @@ func (a *Api) UpdateUserAfterFailedLogin(u *User) error {
 	}
 	u.FailedLogin.Count++
 	u.FailedLogin.Total++
-	now := time.Now()
-	u.FailedLogin.LastFailedTime = now.Format(time.RFC3339)
 	if u.FailedLogin.Count >= a.ApiConfig.MaxFailedLogin {
-		nextAttemptTime := now.Add(time.Minute * time.Duration(a.ApiConfig.DelayToAllowNewLoginAttempt))
+		nextAttemptTime := time.Now().Add(time.Minute * time.Duration(a.ApiConfig.DelayToAllowNewLoginAttempt))
 		u.FailedLogin.NextLoginAttemptTime = nextAttemptTime.Format(time.RFC3339)
 	}
 	return a.Store.UpsertUser(u)
