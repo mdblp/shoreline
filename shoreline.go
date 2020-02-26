@@ -63,7 +63,7 @@ func main() {
 
 	// Set some default config values
 	config.User.MaxFailedLogin = 5
-	config.User.DelayToAllowNewLoginAttempt = 10 // 10 minutes
+	config.User.DelayBeforeNextLoginAttempt = 10 // 10 minutes
 	config.User.MaxConcurrentLogin = 100
 
 	if err := common.LoadEnvironmentConfig([]string{"TIDEPOOL_SHORELINE_ENV", "TIDEPOOL_SHORELINE_SERVICE"}, &config); err != nil {

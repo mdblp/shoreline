@@ -58,7 +58,7 @@ type (
 		MaxFailedLogin int `json:"maxFailedLogin"`
 		// Delay in minutes the user must wait 10min before attempting a new login if the number of
 		// consecutive failed login is more than MaxFailedLogin
-		DelayToAllowNewLoginAttempt int64 `json:"delayToAllowNewLoginAttempt"`
+		DelayBeforeNextLoginAttempt int64 `json:"delayBeforeNextLoginAttempt"`
 		// Maximum number of concurrent login
 		MaxConcurrentLogin int `json:"maxConcurrentLogin"`
 		//allows for the skipping of verification for testing
@@ -68,9 +68,9 @@ type (
 	}
 	// LoginLimiter var needed to limit the max login attempt on an account
 	LoginLimiter struct {
-		mutex               sync.Mutex
-		userNamesInProgress *list.List
-		nInProgress         int
+		mutex           sync.Mutex
+		usersInProgress *list.List
+		totalInProgress int
 	}
 	varsHandler func(http.ResponseWriter, *http.Request, map[string]string)
 )
@@ -136,7 +136,7 @@ func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
 		mailchimpManager: mailchimpManager,
 	}
 
-	api.loginLimiter.userNamesInProgress = list.New()
+	api.loginLimiter.usersInProgress = list.New()
 
 	return &api
 }
@@ -389,7 +389,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
 	} else if originalUser, err := a.Store.FindUser(&User{Id: firstStringNotEmpty(vars["userid"], tokenData.UserId)}); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+		a.sendError(res, http.StatusConflict, STATUS_ERR_FINDING_USR, err)
 
 	} else if originalUser == nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
@@ -618,7 +618,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	code, elem := a.appendUserLoginInProgress(user)
 	defer a.removeUserLoginInProgress(elem)
 	if code != http.StatusOK {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.nInProgress))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.usersInProgress))
 
 	} else if results, err := a.Store.FindUsers(user); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, STATUS_USER_NOT_FOUND, err)
@@ -1019,7 +1019,7 @@ func (a *Api) UpdateUserAfterFailedLogin(u *User) error {
 	u.FailedLogin.Count++
 	u.FailedLogin.Total++
 	if u.FailedLogin.Count >= a.ApiConfig.MaxFailedLogin {
-		nextAttemptTime := time.Now().Add(time.Minute * time.Duration(a.ApiConfig.DelayToAllowNewLoginAttempt))
+		nextAttemptTime := time.Now().Add(time.Minute * time.Duration(a.ApiConfig.DelayBeforeNextLoginAttempt))
 		u.FailedLogin.NextLoginAttemptTime = nextAttemptTime.Format(time.RFC3339)
 	}
 	return a.Store.UpsertUser(u)

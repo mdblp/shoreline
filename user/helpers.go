@@ -149,28 +149,28 @@ func (a *Api) appendUserLoginInProgress(user *User) (code int, elem *list.Elemen
 	defer a.loginLimiter.mutex.Unlock()
 
 	// Simple rate limiter
-	a.loginLimiter.nInProgress++
-	if a.loginLimiter.nInProgress > a.ApiConfig.MaxConcurrentLogin {
+	a.loginLimiter.totalInProgress++
+	if a.loginLimiter.totalInProgress > a.ApiConfig.MaxConcurrentLogin {
 		return http.StatusTooManyRequests, nil
 	}
 
-	for e := a.loginLimiter.userNamesInProgress.Front(); e != nil; e = e.Next() {
+	for e := a.loginLimiter.usersInProgress.Front(); e != nil; e = e.Next() {
 		if e.Value.(User).Username == user.Username {
 			return http.StatusTooManyRequests, nil
 		}
 	}
 
-	e := a.loginLimiter.userNamesInProgress.PushBack(user)
+	e := a.loginLimiter.usersInProgress.PushBack(user)
 	return http.StatusOK, e
 }
 
 func (a *Api) removeUserLoginInProgress(elem *list.Element) {
 	a.loginLimiter.mutex.Lock()
 
-	a.loginLimiter.nInProgress--
+	a.loginLimiter.totalInProgress--
 
 	if elem != nil {
-		a.loginLimiter.userNamesInProgress.Remove(elem)
+		a.loginLimiter.usersInProgress.Remove(elem)
 	}
 	a.loginLimiter.mutex.Unlock()
 }

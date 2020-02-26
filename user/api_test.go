@@ -44,7 +44,7 @@ var (
 		LongTermKey:                 "thelongtermkey",
 		Salt:                        "a mineral substance composed primarily of sodium chloride",
 		MaxFailedLogin:              5,
-		DelayToAllowNewLoginAttempt: 10,
+		DelayBeforeNextLoginAttempt: 10,
 		MaxConcurrentLogin:          100,
 		VerificationSecret:          "",
 		ClinicDemoUserID:            "00000000",
@@ -1376,7 +1376,7 @@ func Test_Login_Error_PasswordMismatch(t *testing.T) {
 
 func Test_Login_Error_AccountLock(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	nextAttemptTime := time.Now().Add(time.Minute * time.Duration(FAKE_CONFIG.DelayToAllowNewLoginAttempt))
+	nextAttemptTime := time.Now().Add(time.Minute * time.Duration(FAKE_CONFIG.DelayBeforeNextLoginAttempt))
 	user := User{
 		Id:     "1111111111",
 		PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5",
