@@ -389,7 +389,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
 	} else if originalUser, err := a.Store.FindUser(&User{Id: firstStringNotEmpty(vars["userid"], tokenData.UserId)}); err != nil {
-		a.sendError(res, http.StatusConflict, STATUS_ERR_FINDING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 	} else if originalUser == nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
