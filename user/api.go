@@ -618,7 +618,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	code, elem := a.appendUserLoginInProgress(user)
 	defer a.removeUserLoginInProgress(elem)
 	if code != http.StatusOK {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.usersInProgress))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.totalInProgress))
 
 	} else if results, err := a.Store.FindUsers(user); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, STATUS_USER_NOT_FOUND, err)
