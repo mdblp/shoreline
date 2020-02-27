@@ -288,7 +288,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingUser) != 0 {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, fmt.Sprintf("User '%s' already exists", *newUserDetails.Username))
+		a.sendError(res, http.StatusConflict, STATUS_ERR_CREATING_USR, fmt.Sprintf("User '%s' already exists", *newUserDetails.Username))
 
 	} else if err := a.Store.UpsertUser(newUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
@@ -621,7 +621,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.totalInProgress))
 
 	} else if results, err := a.Store.FindUsers(user); err != nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, STATUS_USER_NOT_FOUND, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, STATUS_USER_NOT_FOUND, err)
 
 	} else if len(results) != 1 {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' have %d matching results", user.Username, len(results)))
