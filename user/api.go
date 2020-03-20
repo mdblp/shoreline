@@ -19,7 +19,6 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/tidepool-org/go-common/clients"
-	"github.com/tidepool-org/go-common/clients/highwater"
 	"github.com/tidepool-org/go-common/clients/status"
 	"github.com/tidepool-org/shoreline/common"
 	"github.com/tidepool-org/shoreline/oauth2"
@@ -30,7 +29,6 @@ type (
 	Api struct {
 		Store            Storage
 		ApiConfig        ApiConfig
-		metrics          highwater.Client
 		perms            clients.Gatekeeper
 		oauth            oauth2.Client
 		logger           *log.Logger
@@ -113,7 +111,7 @@ const (
 	STATUS_NO_EXPECTED_PWD       = "No expected password is found"
 )
 
-func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
+func InitApi(cfg ApiConfig, store Storage) *Api {
 	logger := log.New(os.Stdout, USER_API_PREFIX, log.LstdFlags|log.Lshortfile)
 
 	mailchimpManager, err := mailchimp.NewManager(logger, &http.Client{Timeout: 15 * time.Second}, &cfg.Mailchimp)
@@ -131,7 +129,6 @@ func InitApi(cfg ApiConfig, store Storage, metrics highwater.Client) *Api {
 	api := Api{
 		Store:            store,
 		ApiConfig:        cfg,
-		metrics:          metrics,
 		logger:           logger,
 		mailchimpManager: mailchimpManager,
 	}
