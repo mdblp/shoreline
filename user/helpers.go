@@ -68,24 +68,22 @@ func sendModelAsResWithStatus(res http.ResponseWriter, model interface{}, status
 // logAudit Variatic log for audit trails
 func (a *Api) logAudit(req *http.Request, tokenData *TokenData, format string, args ...interface{}) {
 	var prefix string
-	var isServer bool
-	traceSession := req.Header.Get(TP_TRACE_SESSION)
 
+	if req.RemoteAddr != "" {
+		prefix = fmt.Sprintf("remoteAddr{%s}, ", req.RemoteAddr)
+	}
+
+	traceSession := req.Header.Get(TP_TRACE_SESSION)
 	if traceSession != "" {
-		prefix = fmt.Sprintf("trace{%s}, ", traceSession)
+		prefix += fmt.Sprintf("trace{%s}, ", traceSession)
 	}
 
 	if tokenData != nil {
-		isServer = tokenData.IsServer
+		prefix += fmt.Sprintf("isServer{%t}, ", tokenData.IsServer)
 	}
-	prefix += fmt.Sprintf("isServer{%t}", isServer)
 
-	userAgent := req.UserAgent()
-	if userAgent != "" {
-		prefix += fmt.Sprintf(", userAgent{%s}", userAgent)
-	}
 	s := fmt.Sprintf(format, args...)
-	a.logger.Printf("%s: %s", prefix, s)
+	a.logger.Printf("%s%s", prefix, s)
 }
 
 func (a *Api) sendUser(res http.ResponseWriter, user *User, isServerRequest bool) {

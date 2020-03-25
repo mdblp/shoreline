@@ -254,6 +254,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		default:
 			a.sendError(res, http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN)
 		}
+		// TODO: Verify no return in case of error here ?
 		a.logAudit(req, tokenData, "GetUsers")
 		a.sendUsers(res, users, tokenData.IsServer)
 	}
@@ -520,7 +521,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
 
 		} else {
-			a.logAudit(req, tokenData, "GetUserInfo isClinic{%t}", user.IsClinic())
+			a.logAudit(req, tokenData, "GetUserInfo isClinic{%t}", result.IsClinic())
 			a.sendUser(res, result, tokenData.IsServer)
 		}
 	}
@@ -834,6 +835,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
 		return
 	} else {
+		a.logAudit(req, td, "RefreshSession")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 		sendModelAsRes(res, td)
 		return
@@ -895,6 +897,7 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 			return
 		}
 
+		a.logAudit(req, td, "ServerCheckToken")
 		sendModelAsRes(res, td)
 		return
 	}
@@ -914,11 +917,12 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 	if id := req.Header.Get(TP_SESSION_TOKEN); id != "" {
 		if err := a.Store.RemoveTokenByID(id); err != nil {
-			//sliently fail but still log it
+			// silently fail but still log it
 			a.logger.Println("Logout was unable to delete token", err.Error())
 		}
 	}
-	//otherwise all good
+	// otherwise all good
+	a.logAudit(req, nil, "Logout")
 	res.WriteHeader(http.StatusOK)
 	return
 }
