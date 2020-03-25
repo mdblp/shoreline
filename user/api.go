@@ -80,6 +80,8 @@ const (
 	TP_SERVER_NAME   = "x-tidepool-server-name"
 	TP_SERVER_SECRET = "x-tidepool-server-secret"
 	TP_SESSION_TOKEN = "x-tidepool-session-token"
+	// TP_TRACE_SESSION Session trace: uuid v4
+	TP_TRACE_SESSION = "x-tidepool-trace-session"
 
 	STATUS_NO_USR_DETAILS        = "No user details were given"
 	STATUS_INVALID_USER_DETAILS  = "Invalid user details were given"
@@ -252,7 +254,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		default:
 			a.sendError(res, http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN)
 		}
-		a.logMetric("getusers", sessionToken, map[string]string{"server": strconv.FormatBool(tokenData.IsServer)})
+		a.logAudit(req, tokenData, "GetUsers")
 		a.sendUsers(res, users, tokenData.IsServer)
 	}
 }
@@ -305,7 +307,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		if sessionToken, err := CreateSessionTokenAndSave(&tokenData, tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
 		} else {
-			a.logMetricForUser(newUser.Id, "usercreated", sessionToken.ID, map[string]string{"server": "false"})
+			a.logAudit(req, &tokenData, "CreateUser isClinic{%t}", newUser.IsClinic())
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			a.sendUserWithStatus(res, newUser, http.StatusCreated, false)
 		}
@@ -354,7 +356,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 		if _, err := a.perms.SetPermissions(custodianUserId, newCustodialUser.Id, permissions); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 		} else {
-			a.logMetricForUser(newCustodialUser.Id, "custodialusercreated", sessionToken, map[string]string{"server": strconv.FormatBool(tokenData.IsServer)})
+			a.logAudit(req, tokenData, "CreateCustodialUser isClinic{%t}", newCustodialUser.IsClinic())
 			a.sendUserWithStatus(res, newCustodialUser, http.StatusCreated, tokenData.IsServer)
 		}
 	}
@@ -469,7 +471,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 					}
 				}
 			}
-			a.logMetricForUser(updatedUser.Id, "userupdated", sessionToken, map[string]string{"server": strconv.FormatBool(tokenData.IsServer)})
+			a.logAudit(req, tokenData, "UpdateUser isClinic{%t}", updatedUser.IsClinic())
 			a.sendUser(res, updatedUser, tokenData.IsServer)
 		}
 	}
@@ -518,7 +520,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
 
 		} else {
-			a.logMetricForUser(user.Id, "getuserinfo", sessionToken, map[string]string{"server": strconv.FormatBool(tokenData.IsServer)})
+			a.logAudit(req, tokenData, "GetUserInfo isClinic{%t}", user.IsClinic())
 			a.sendUser(res, result, tokenData.IsServer)
 		}
 	}
@@ -565,11 +567,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); err == nil {
 			if err = a.Store.RemoveUser(toDelete); err == nil {
 
-				if td.IsServer {
-					a.logMetricForUser(id, "deleteuser", req.Header.Get(TP_SESSION_TOKEN), map[string]string{"server": "true"})
-				} else {
-					a.logMetric("deleteuser", req.Header.Get(TP_SESSION_TOKEN), map[string]string{"server": "false"})
-				}
+				a.logAudit(req, td, "DeleteUser")
 				//cleanup if any
 				if td.IsServer == false {
 					a.Store.RemoveTokenByID(req.Header.Get(TP_SESSION_TOKEN))
@@ -649,7 +647,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
 
 		} else {
-			a.logMetric("userlogin", sessionToken.ID, nil)
+			a.logAudit(req, tokenData, "Login")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			a.sendUser(res, result, false)
 		}
@@ -720,7 +718,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 			return
 		} else {
 			// Server is provided with the generated token
-			a.logMetricAsServer("serverlogin", sessionToken.ID, nil)
+			a.logAudit(req, nil, "ServerLogin")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			return
 		}
