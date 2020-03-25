@@ -897,7 +897,6 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 			return
 		}
 
-		a.logAudit(req, td, "ServerCheckToken")
 		sendModelAsRes(res, td)
 		return
 	}
