@@ -83,7 +83,7 @@ func (a *Api) logAudit(req *http.Request, tokenData *TokenData, format string, a
 	}
 
 	s := fmt.Sprintf(format, args...)
-	a.logger.Printf("%s%s", prefix, s)
+	a.auditLogger.Printf("%s%s", prefix, s)
 }
 
 func (a *Api) sendUser(res http.ResponseWriter, user *User, isServerRequest bool) {

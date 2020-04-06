@@ -32,6 +32,7 @@ type (
 		perms            clients.Gatekeeper
 		oauth            oauth2.Client
 		logger           *log.Logger
+		auditLogger      *log.Logger
 		mailchimpManager mailchimp.Manager
 		loginLimiter     LoginLimiter
 	}
@@ -115,6 +116,7 @@ const (
 
 func InitApi(cfg ApiConfig, store Storage) *Api {
 	logger := log.New(os.Stdout, USER_API_PREFIX, log.LstdFlags|log.Lshortfile)
+	auditLogger := log.New(os.Stdout, USER_API_PREFIX, log.LstdFlags)
 
 	mailchimpManager, err := mailchimp.NewManager(logger, &http.Client{Timeout: 15 * time.Second}, &cfg.Mailchimp)
 	if err != nil {
@@ -132,6 +134,7 @@ func InitApi(cfg ApiConfig, store Storage) *Api {
 		Store:            store,
 		ApiConfig:        cfg,
 		logger:           logger,
+		auditLogger:      auditLogger,
 		mailchimpManager: mailchimpManager,
 	}
 
