@@ -47,7 +47,7 @@ deploy:
     bucket: com.diabeloop.yourloops.doc
     skip_cleanup: true
     local_dir: soup
-    upload-dir: soup/blp
+    upload-dir: soup
     cache_control: "max-age=21600"
 
 services:
