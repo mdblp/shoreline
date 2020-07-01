@@ -46,7 +46,7 @@ deploy:
     region: $AWS_DEFAULT_REGION
     bucket: com.diabeloop.yourloops.doc
     skip_cleanup: true
-    local_dir: soup
+    local_dir: ./docs/soup
     upload-dir: soup
     cache_control: "max-age=21600"
 
