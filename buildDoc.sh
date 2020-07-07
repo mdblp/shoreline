@@ -1,4 +1,4 @@
-#!/bin/sh -eux
+#!/bin/bash -eux
 # Generate OpenAPI documentation
 GOPATH=${GOPATH:-~/go}
 echo "Using GOPATH: ${GOPATH}"
