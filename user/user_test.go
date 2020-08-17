@@ -80,7 +80,7 @@ func Test_ExtractArray_Present_NotArray(t *testing.T) {
 
 func Test_ExtractStringArray_Missing(t *testing.T) {
 	source := map[string]interface{}{"additional": "unexpected"}
-	result, ok := ExtractStringArray(source, "target")
+	result, ok := extractStringArray(source, "target")
 	if result != nil || !ok {
 		t.Fatalf("Unexpected result [%#v, %t]", result, ok)
 	}
@@ -88,7 +88,7 @@ func Test_ExtractStringArray_Missing(t *testing.T) {
 
 func Test_ExtractStringArray_Present(t *testing.T) {
 	source := map[string]interface{}{"target": []interface{}{"expected", "expected-2", "expected-3"}, "additional": "unexpected"}
-	result, ok := ExtractStringArray(source, "target")
+	result, ok := extractStringArray(source, "target")
 	if !reflect.DeepEqual(result, []string{"expected", "expected-2", "expected-3"}) || !ok {
 		t.Fatalf("Unexpected result [%#v, %t]", result, ok)
 	}
@@ -96,7 +96,7 @@ func Test_ExtractStringArray_Present(t *testing.T) {
 
 func Test_ExtractStringArray_Present_NotStringArray(t *testing.T) {
 	source := map[string]interface{}{"target": true, "additional": "unexpected"}
-	result, ok := ExtractStringArray(source, "target")
+	result, ok := extractStringArray(source, "target")
 	if result != nil || ok {
 		t.Fatalf("Unexpected result [%#v, %t]", result, ok)
 	}
@@ -129,7 +129,7 @@ func Test_ExtractStringMap_Present_NotStringMap(t *testing.T) {
 func Test_IsValidEmail_Invalid(t *testing.T) {
 	invalidEmails := []string{"", "a", "a@", "a@z", "a@z.", "a@z.c", ".co", "z.co", "@z.co", "a@b@z.co", "a b@z.co", "a@z$z.co", "a@x#z.co"}
 	for _, invalidEmail := range invalidEmails {
-		if IsValidEmail(invalidEmail) {
+		if isValidEmail(invalidEmail) {
 			t.Fatalf("Invalid email %s is unexpectedly valid", invalidEmail)
 		}
 	}
@@ -138,7 +138,7 @@ func Test_IsValidEmail_Invalid(t *testing.T) {
 func Test_IsValidEmail_Valid(t *testing.T) {
 	validEmails := []string{"a@z.com", "a-b@z.com", "a$b@z.com", "a#b@z.com", "a@stuvwxyz.co", "a@z.company"}
 	for _, validEmail := range validEmails {
-		if !IsValidEmail(validEmail) {
+		if !isValidEmail(validEmail) {
 			t.Fatalf("Valid email %s is unexpectedly invalid", validEmail)
 		}
 	}
@@ -268,7 +268,7 @@ func Test_NewUserDetails_ExtractFromJSON_InvalidRoles(t *testing.T) {
 	source := "{\"username\": \"a@z.co\", \"emails\": [\"b@y.co\"], \"password\": \"12345678\", \"roles\": true}"
 	details := &NewUserDetails{}
 	err := details.ExtractFromJSON(strings.NewReader(source))
-	if err != User_error_roles_invalid {
+	if err != errUserRolesInvalid {
 		t.Fatalf("Unexpected error for invalid roles: %#v", err)
 	}
 	if details.Username != nil || details.Emails != nil || details.Password != nil || details.Roles != nil {
@@ -340,7 +340,7 @@ func Test_NewUserDetails_Validate_Username_Missing(t *testing.T) {
 	password := "12345678"
 	details := &NewUserDetails{Emails: []string{"b@y.co", "c@x.co"}, Password: &password}
 	err := details.Validate()
-	if err != User_error_username_missing {
+	if err != errUserUsernameMissing {
 		t.Fatalf("Unexpected error for username missing: %#v", err)
 	}
 }
@@ -399,7 +399,7 @@ func Test_NewUserDetails_Validate_Roles_Invalid(t *testing.T) {
 	password := "12345678"
 	details := &NewUserDetails{Username: &username, Emails: []string{"b@y.co", "c@x.co"}, Password: &password, Roles: []string{"invalid"}}
 	err := details.Validate()
-	if err != User_error_roles_invalid {
+	if err != errUserRolesInvalid {
 		t.Fatalf("Unexpected error for roles invalid: %#v", err)
 	}
 }
@@ -497,7 +497,7 @@ func Test_NewUser_Valid(t *testing.T) {
 	if !reflect.DeepEqual(details.Roles, []string{"clinic"}) {
 		t.Fatalf("Roles do not match on success")
 	}
-	if user.Id == "" || user.Hash == "" {
+	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
 	if user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
@@ -718,7 +718,7 @@ func Test_NewCustodialUser_ValidAll(t *testing.T) {
 	if user.Username != *details.Username || !reflect.DeepEqual(user.Emails, details.Emails) {
 		t.Fatalf("Fields do not match on success")
 	}
-	if user.Id == "" || user.Hash == "" {
+	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
 	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
@@ -739,7 +739,7 @@ func Test_NewCustodialUser_ValidNone(t *testing.T) {
 	if user.Username != "" || len(user.Emails) != 0 {
 		t.Fatalf("Fields do not match on success")
 	}
-	if user.Id == "" || user.Hash == "" {
+	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
 	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
@@ -796,7 +796,7 @@ func Test_UpdateUserDetails_ExtractFromJSON_InvalidEmails(t *testing.T) {
 }
 
 func Test_UpdateUserDetails_ExtractFromJSON_InvalidPassword(t *testing.T) {
-	source := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"b@y.co\"], \"password\": true, \"roles\": [\"clinic\"], \"termsAccepted\": \"2016-01-01T12:00:00-08:00\", \"emailVerified\": true}}"
+	source := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"b@y.co\"], \"password\": true, \"roles\": [\"patient\"], \"termsAccepted\": \"2016-01-01T12:00:00-08:00\", \"emailVerified\": true}}"
 	details := &UpdateUserDetails{}
 	err := details.ExtractFromJSON(strings.NewReader(source))
 	if err != User_error_password_invalid {
@@ -811,7 +811,7 @@ func Test_UpdateUserDetails_ExtractFromJSON_InvalidRoles(t *testing.T) {
 	source := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"b@y.co\"], \"password\": \"12345678\", \"roles\": [true], \"termsAccepted\": \"2016-01-01T12:00:00-08:00\", \"emailVerified\": true}}"
 	details := &UpdateUserDetails{}
 	err := details.ExtractFromJSON(strings.NewReader(source))
-	if err != User_error_roles_invalid {
+	if err != errUserRolesInvalid {
 		t.Fatalf("Unexpected error for invalid roles: %#v", err)
 	}
 	if details.Username != nil || details.Emails != nil || details.Password != nil || details.Roles != nil || details.TermsAccepted != nil || details.EmailVerified != nil {
@@ -1163,7 +1163,7 @@ func Test_User_IsClinic_Invalid(t *testing.T) {
 }
 
 func Test_User_HashPassword(t *testing.T) {
-	user := &User{Id: "123-user-id-you-know-me"}
+	user := &User{ID: "123-user-id-you-know-me"}
 
 	if err := user.HashPassword("my pw", "the salt"); err == nil {
 		if user.PwHash == "" {
@@ -1175,7 +1175,7 @@ func Test_User_HashPassword(t *testing.T) {
 }
 
 func Test_User_HashPassword_WithEmptyParams(t *testing.T) {
-	user := &User{Id: "123-user-id-you-know-me"}
+	user := &User{ID: "123-user-id-you-know-me"}
 
 	if err := user.HashPassword("", ""); err == nil {
 		t.Fatalf("there should be an error when the parameters are not passed")
@@ -1187,7 +1187,7 @@ func Test_User_HashPassword_WithEmptyParams(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_Match(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
@@ -1199,7 +1199,7 @@ func Test_User_PasswordsMatch_Match(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_NoMatch_Case(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
@@ -1211,7 +1211,7 @@ func Test_User_PasswordsMatch_NoMatch_Case(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingUserPassword(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	salt := "abc"
 	if user.PasswordsMatch("3th3Hardw0y", salt) {
 		t.Fatalf("PasswordsMatch returned true when missing salt")
@@ -1219,7 +1219,7 @@ func Test_User_PasswordsMatch_NoMatch_MissingUserPassword(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingQueryPassword(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
@@ -1231,7 +1231,7 @@ func Test_User_PasswordsMatch_NoMatch_MissingQueryPassword(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingSalt(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
@@ -1278,14 +1278,13 @@ func Test_User_IsVerified(t *testing.T) {
 
 func Test_User_DeepClone(t *testing.T) {
 	user := &User{
-		Id:            "1234567890",
+		ID:            "1234567890",
 		Username:      "a@b.co",
 		Emails:        []string{"a@b.co", "c@d.co"},
 		Roles:         []string{"clinic"},
 		TermsAccepted: "2016-01-01T12:34:56-08:00",
 		EmailVerified: true,
 		PwHash:        "this-is-the-password-hash",
-		Hash:          "this-is-the-hash",
 		Private:       map[string]*IdHashPair{"a": &IdHashPair{"1", "2"}, "b": &IdHashPair{"3", "4"}},
 	}
 	clonedUser := user.DeepClone()

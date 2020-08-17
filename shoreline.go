@@ -36,7 +36,6 @@ import (
 	common "github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
-	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/shoreline/oauth2"
 	"github.com/tidepool-org/shoreline/user"
@@ -123,10 +122,6 @@ func main() {
 		}
 	}
 
-	clinicDemoUserID, found := os.LookupEnv("DEMO_CLINIC_USER_ID")
-	if found {
-		config.User.ClinicDemoUserID = clinicDemoUserID
-	}
 	config.User.Marketo.ID, _ = os.LookupEnv("MARKETO_ID")
 
 	config.User.Marketo.URL, _ = os.LookupEnv("MARKETO_URL")
@@ -158,22 +153,6 @@ func main() {
 	}
 
 	config.Mongo.FromEnv()
-
-	/*
-	 * Hakken setup
-	 */
-	hakkenClient := hakken.NewHakkenBuilder().
-		WithConfig(&config.HakkenConfig).
-		Build()
-
-	if !config.HakkenConfig.SkipHakken {
-		if err := hakkenClient.Start(); err != nil {
-			logger.Fatal(err)
-		}
-		defer hakkenClient.Close()
-	} else {
-		logger.Print("skipping hakken service")
-	}
 
 	/*
 	 * Clients
@@ -212,8 +191,8 @@ func main() {
 
 	logger.Print("creating gatekeeper client")
 	permsClient := clients.NewGatekeeperClientBuilder().
-		WithHostGetter(config.GatekeeperConfig.ToHostGetter(hakkenClient)).
 		WithHttpClient(httpClient).
+		WithHostGetter(config.GatekeeperConfig.ToHostGetter(nil)).
 		WithTokenProvider(userClient).
 		Build()
 
@@ -253,21 +232,17 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	hakkenClient.Publish(&config.Service)
-
 	logger.Print("listenting for signals")
 
 	signals := make(chan os.Signal, 40)
 	signal.Notify(signals)
 	go func() {
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 		for {
-			sig := <-signals
-			logger.Printf("Got signal [%s]", sig)
-
-			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-				server.Close()
-				done <- true
-			}
+			<-sigc
+			server.Close()
+			done <- true
 		}
 	}()
 

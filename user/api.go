@@ -78,7 +78,7 @@ var (
 		Name: "statusErrorUpdatingPwCounter",
 		Help: "The total number of STATUS_ERROR_UPDATING_PW errors",
 	})
-	statusMissingIdPwCounter = promauto.NewCounter(prometheus.CounterOpts{
+	statusMissingIDPwCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "statusMissingIdPwCounter",
 		Help: "The total number of STATUS_MISSING_ID_PW errors",
 	})
@@ -154,7 +154,7 @@ type (
 		auditLogger      *log.Logger
 		mailchimpManager mailchimp.Manager
 		loginLimiter     LoginLimiter
-		marketoManager marketo.Manager
+		marketoManager   marketo.Manager
 	}
 	Secret struct {
 		Secret string `json:"secret"`
@@ -183,8 +183,7 @@ type (
 		// Block users to do multiple parallel logins (for load tests we desactivate this)
 		BlockParallelLogin bool `json:blockParallelLogin`
 		//allows for the skipping of verification for testing
-		VerificationSecret string `json:"verificationSecret"`
-		ClinicDemoUserID   string `json:"clinicDemoUserId"`
+		VerificationSecret string           `json:"verificationSecret"`
 		Mailchimp          mailchimp.Config `json:"mailchimp"`
 		// to create type/file
 		Marketo marketo.Config `json:"marketo"`
@@ -239,7 +238,7 @@ const (
 	STATUS_NO_EXPECTED_PWD       = "No expected password is found"
 )
 
-func InitApi(cfg ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger,manager marketo.Manager) *Api {
+func InitApi(cfg ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger, manager marketo.Manager) *Api {
 
 	mailchimpManager, err := mailchimp.NewManager(logger, &http.Client{Timeout: 15 * time.Second}, &cfg.Mailchimp)
 	if err != nil {
@@ -259,7 +258,7 @@ func InitApi(cfg ApiConfig, logger *log.Logger, store Storage, auditLogger *log.
 		logger:           logger,
 		auditLogger:      auditLogger,
 		mailchimpManager: mailchimpManager,
-		marketoManager: manager,
+		marketoManager:   manager,
 	}
 
 	api.loginLimiter.usersInProgress = list.New()
@@ -345,7 +344,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @Accept  json
 // @Produce  json
 // @Param role query string false "Role" Enums(clinic)
-// @Param id query string false "List of UserId separated by ,"
+// @Param id query string false "List of UserID separated by ,"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -405,8 +404,10 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(300)))
 
 	if newUserDetails, err := ParseNewUserDetails(req.Body); err != nil {
+		a.logAudit(req, &TokenData{}, "Failed to parsed new user details")
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 	} else if err := newUserDetails.Validate(); err != nil { // TODO: Fix this duplicate work!
+		a.logAudit(req, &TokenData{UserRoles: newUserDetails.Roles}, "Failed to validate new user details")
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
@@ -420,18 +421,9 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else {
-		if newUser.IsClinic() {
-			if a.ApiConfig.ClinicDemoUserID != "" {
-				if _, err := a.perms.SetPermissions(newUser.Id, a.ApiConfig.ClinicDemoUserID, clients.Permissions{"view": clients.Allowed}); err != nil {
-					a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
-					return
-				}
-			}
-		}
-
-		tokenData := TokenData{DurationSecs: extractTokenDuration(req), UserId: newUser.Id, IsServer: false}
+		tokenData := TokenData{DurationSecs: extractTokenDuration(req), UserID: newUser.ID, IsServer: false}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(&tokenData, tokenConfig, a.Store); err != nil {
+		if sessionToken, err := createSessionTokenAndSave(&tokenData, tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
 		} else {
 			a.logAudit(req, &tokenData, "CreateUser isClinic{%t}", newUser.IsClinic())
@@ -462,7 +454,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 	if tokenData, err := a.authenticateSessionToken(sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
 
-	} else if custodianUserID := vars["userid"]; !tokenData.IsServer && custodianUserID != tokenData.UserId {
+	} else if custodianUserID := vars["userid"]; !tokenData.IsServer && custodianUserID != tokenData.UserID {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Token user id must match custodian user id or server")
 
 	} else if newCustodialUserDetails, err := ParseNewCustodialUserDetails(req.Body); err != nil {
@@ -482,7 +474,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 
 	} else {
 		permissions := clients.Permissions{"custodian": clients.Allowed, "view": clients.Allowed, "upload": clients.Allowed}
-		if _, err := a.perms.SetPermissions(custodianUserID, newCustodialUser.Id, permissions); err != nil {
+		if _, err := a.perms.SetPermissions(custodianUserID, newCustodialUser.ID, permissions); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 		} else {
 			a.logAudit(req, tokenData, "CreateCustodialUser isClinic{%t}", newCustodialUser.IsClinic())
@@ -517,13 +509,13 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 	} else if err := updateUserDetails.Validate(); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
-	} else if originalUser, err := a.Store.FindUser(&User{Id: firstStringNotEmpty(vars["userid"], tokenData.UserId)}); err != nil {
+	} else if originalUser, err := a.Store.FindUser(&User{ID: firstStringNotEmpty(vars["userid"], tokenData.UserID)}); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 	} else if originalUser == nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
 
-	} else if permissions, err := a.tokenUserHasRequestedPermissions(tokenData, originalUser.Id, clients.Permissions{"root": clients.Allowed, "custodian": clients.Allowed}); err != nil {
+	} else if permissions, err := a.tokenUserHasRequestedPermissions(tokenData, originalUser.ID, clients.Permissions{"root": clients.Allowed, "custodian": clients.Allowed}); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 	} else if len(permissions) == 0 {
@@ -554,7 +546,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			if results, err := a.Store.FindUsers(dupCheck); err != nil {
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 				return
-			} else if len(results) == 1 && results[0].Id != firstStringNotEmpty(vars["userid"], tokenData.UserId) {
+			} else if len(results) == 1 && results[0].ID != firstStringNotEmpty(vars["userid"], tokenData.UserID) {
 				//only throw an error if there is a user with a different id but with the same username/email
 				a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS)
 				return
@@ -587,7 +579,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, err)
 		} else {
 			if len(originalUser.PwHash) == 0 && len(updatedUser.PwHash) != 0 {
-				if err := a.removeUserPermissions(updatedUser.Id, clients.Permissions{"custodian": clients.Allowed}); err != nil {
+				if err := a.removeUserPermissions(updatedUser.ID, clients.Permissions{"custodian": clients.Allowed}); err != nil {
 					a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, err)
 				}
 			}
@@ -635,9 +627,9 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 	} else {
 		var user *User
 		if userID := vars["userid"]; userID != "" {
-			user = &User{Id: userID, Username: userID, Emails: []string{userID}}
+			user = &User{ID: userID, Username: userID, Emails: []string{userID}}
 		} else {
-			user = &User{Id: tokenData.UserId}
+			user = &User{ID: tokenData.UserID}
 		}
 
 		if results, err := a.Store.FindUsers(user); err != nil {
@@ -652,7 +644,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 		} else if result := results[0]; result == nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, "Found user is nil")
 
-		} else if permissions, err := a.tokenUserHasRequestedPermissions(tokenData, result.Id, clients.Permissions{"root": clients.Allowed, "custodian": clients.Allowed}); err != nil {
+		} else if permissions, err := a.tokenUserHasRequestedPermissions(tokenData, result.ID, clients.Permissions{"root": clients.Allowed, "custodian": clients.Allowed}); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 		} else if permissions["root"] == nil && permissions["custodian"] == nil {
@@ -693,7 +685,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 		id = vars["userid"]
 		a.logger.Println("operating as server")
 	} else {
-		id = td.UserId
+		id = td.UserID
 	}
 
 	pw := getGivenDetail(req)["password"]
@@ -701,7 +693,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 	if id != "" && pw != "" {
 
 		var err error
-		toDelete := &User{Id: id}
+		toDelete := &User{ID: id}
 
 		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); err == nil {
 			if err = a.Store.RemoveUser(toDelete); err == nil {
@@ -780,9 +772,14 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)
 
 	} else {
-		tokenData := &TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id}
+		if result.Roles == nil {
+			result.Roles = make([]string, 1)
+			result.Roles[0] = userRolePatient
+			a.Store.UpsertUser(result)
+		}
+		tokenData := &TokenData{DurationSecs: extractTokenDuration(req), UserID: result.ID, UserRoles: result.Roles}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(tokenData, tokenConfig, a.Store); err != nil {
+		if sessionToken, err := createSessionTokenAndSave(tokenData, tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
 
 		} else {
@@ -846,21 +843,20 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	// If the expected secret is the one given at the door then we can generate a token
 	if pw == expectedSecret {
 		//generate new token
-		if sessionToken, err := CreateSessionTokenAndSave(
-			&TokenData{DurationSecs: extractTokenDuration(req), UserId: server, IsServer: true},
+		if sessionToken, err := createSessionTokenAndSave(
+			&TokenData{DurationSecs: extractTokenDuration(req), UserID: server, IsServer: true},
 			TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
 			a.Store,
 		); err != nil {
 			// Error generating the token
 			a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 			sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
-			return
 		} else {
 			// Server is provided with the generated token
 			a.logAudit(req, nil, "ServerLogin")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-			return
 		}
+		return
 	}
 	// If the password given at the door is wrong, we cannot generate the token
 	a.logger.Println(http.StatusUnauthorized, STATUS_PW_WRONG)
@@ -901,7 +897,7 @@ func (a *Api) oauth2Login(w http.ResponseWriter, r *http.Request) {
 				}
 
 				//check the corresponding user
-				fndUsr, errUsr := a.Store.FindUser(&User{Id: result["userId"].(string)})
+				fndUsr, errUsr := a.Store.FindUser(&User{ID: result["userId"].(string)})
 				if errUsr != nil || fndUsr == nil {
 					a.logger.Println(http.StatusUnauthorized, "oauth2Login error getting user ", errUsr.Error())
 					w.WriteHeader(http.StatusUnauthorized)
@@ -909,8 +905,8 @@ func (a *Api) oauth2Login(w http.ResponseWriter, r *http.Request) {
 				}
 
 				//generate token and send the response
-				if sessionToken, err := CreateSessionTokenAndSave(
-					&TokenData{DurationSecs: 0, UserId: result["userId"].(string), IsServer: false},
+				if sessionToken, err := createSessionTokenAndSave(
+					&TokenData{DurationSecs: 0, UserID: result["userId"].(string), IsServer: false},
 					TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
 					a.Store,
 				); err != nil {
@@ -958,7 +954,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	}
 
 	//refresh
-	if sessionToken, err := CreateSessionTokenAndSave(
+	if sessionToken, err := createSessionTokenAndSave(
 		td,
 		TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
 		a.Store,
@@ -991,15 +987,14 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 // Set the longeterm duration and then process as per Login
 // note: see Login for return codes
 func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map[string]string) {
+	const dayAsSecs = 1 * 24 * 60 * 60
 
-	const day_as_secs = 1 * 24 * 60 * 60
-
-	duration := a.ApiConfig.LongTermDaysDuration * day_as_secs
+	duration := a.ApiConfig.LongTermDaysDuration * dayAsSecs
 	longtermkey := vars["longtermkey"]
 
 	if longtermkey == a.ApiConfig.LongTermKey {
 		a.logger.Println("token duration is ", fmt.Sprint(time.Duration(duration)*time.Second))
-		req.Header.Add(TOKEN_DURATION_KEY, strconv.FormatFloat(float64(duration), 'f', -1, 64))
+		req.Header.Add(TokenDurationKey, strconv.FormatFloat(float64(duration), 'f', -1, 64))
 	} else {
 		//tell us there was no match
 		a.logger.Println("tried to login using the longtermkey but it didn't match the stored key")
@@ -1007,7 +1002,7 @@ func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map
 
 	a.Login(res, req)
 
-	// TODO: Does not actually add the TOKEN_DURATION_KEY to the response on success (as the old unittests would imply)
+	// TODO: Does not actually add the TokenDurationKey to the response on success (as the old unittests would imply)
 }
 
 // @Summary Check server token
@@ -1123,7 +1118,7 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 		statusErrorUpdatingPwCounter.Inc()
 
 	case STATUS_MISSING_ID_PW:
-		statusMissingIdPwCounter.Inc()
+		statusMissingIDPwCounter.Inc()
 
 	case STATUS_NO_MATCH:
 		statusNoMatchCounter.Inc()
@@ -1178,7 +1173,7 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 func (a *Api) authenticateSessionToken(sessionToken string) (*TokenData, error) {
 	if sessionToken == "" {
 		return nil, errors.New("Session token is empty")
-	} else if tokenData, err := UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
+	} else if tokenData, err := unpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
 		return nil, err
 	} else if _, err := a.Store.FindTokenByID(sessionToken); err != nil {
 		return nil, err
@@ -1190,9 +1185,9 @@ func (a *Api) authenticateSessionToken(sessionToken string) (*TokenData, error) 
 func (a *Api) tokenUserHasRequestedPermissions(tokenData *TokenData, groupId string, requestedPermissions clients.Permissions) (clients.Permissions, error) {
 	if tokenData.IsServer {
 		return requestedPermissions, nil
-	} else if tokenData.UserId == groupId {
+	} else if tokenData.UserID == groupId {
 		return requestedPermissions, nil
-	} else if actualPermissions, err := a.perms.UserInGroup(tokenData.UserId, groupId); err != nil {
+	} else if actualPermissions, err := a.perms.UserInGroup(tokenData.UserID, groupId); err != nil {
 		return clients.Permissions{}, err
 	} else {
 		finalPermissions := make(clients.Permissions, 0)

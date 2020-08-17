@@ -76,9 +76,9 @@ func (d MockStoreClient) FindUsersWithIds(ids []string) (found []*User, err erro
 	for _, id := range ids {
 		switch id {
 		case "0000000000":
-			users = append(users, &User{Id: "0000000000", Username: usernameOne, Emails: []string{usernameOne}})
+			users = append(users, &User{ID: "0000000000", Username: usernameOne, Emails: []string{usernameOne}})
 		case "0000000001":
-			users = append(users, &User{Id: "0000000001", Username: usernameTwo, Emails: []string{usernameTwo}})
+			users = append(users, &User{ID: "0000000001", Username: usernameTwo, Emails: []string{usernameTwo}})
 		}
 	}
 

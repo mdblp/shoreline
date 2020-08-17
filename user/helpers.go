@@ -43,7 +43,7 @@ func unpackAuth(authLine string) (usr *User, pw string) {
 			details := strings.SplitN(string(decodedPayload), ":", 2)
 			if details[0] != "" || details[1] != "" {
 				//Note the incoming `name` could infact be id, email or the username
-				return &User{Id: details[0], Username: details[0], Emails: []string{details[0]}}, details[1]
+				return &User{ID: details[0], Username: details[0], Emails: []string{details[0]}}, details[1]
 			}
 		}
 	}
@@ -80,6 +80,9 @@ func (a *Api) logAudit(req *http.Request, tokenData *TokenData, format string, a
 
 	if tokenData != nil {
 		prefix += fmt.Sprintf("isServer{%t}, ", tokenData.IsServer)
+		if tokenData.UserRoles != nil {
+			prefix += fmt.Sprintf("roles{%s}, ", strings.Join(tokenData.UserRoles, ","))
+		}
 	}
 
 	s := fmt.Sprintf(format, args...)
@@ -106,8 +109,8 @@ func (a *Api) sendUsers(res http.ResponseWriter, users []*User, isServerRequest 
 
 func (a *Api) asSerializableUser(user *User, isServerRequest bool) interface{} {
 	serializable := make(map[string]interface{})
-	if len(user.Id) > 0 {
-		serializable["userid"] = user.Id
+	if len(user.ID) > 0 {
+		serializable["userid"] = user.ID
 	}
 	if len(user.Username) > 0 {
 		serializable["username"] = user.Username
@@ -117,6 +120,11 @@ func (a *Api) asSerializableUser(user *User, isServerRequest bool) interface{} {
 	}
 	if len(user.Roles) > 0 {
 		serializable["roles"] = user.Roles
+	} else {
+		roles := make([]string, 1)
+		roles[0] = userRolePatient
+		serializable["roles"] = roles
+
 	}
 	if len(user.TermsAccepted) > 0 {
 		serializable["termsAccepted"] = user.TermsAccepted

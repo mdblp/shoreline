@@ -69,7 +69,7 @@ func (d MongoStoreClient) UpsertUser(user *User) error {
 	}
 
 	// if the user already exists we update otherwise we add
-	if _, err := mgoUsersCollection(cpy).Upsert(bson.M{"userid": user.Id}, user); err != nil {
+	if _, err := mgoUsersCollection(cpy).Upsert(bson.M{"userid": user.ID}, user); err != nil {
 		return err
 	}
 	return nil
@@ -77,11 +77,11 @@ func (d MongoStoreClient) UpsertUser(user *User) error {
 
 func (d MongoStoreClient) FindUser(user *User) (result *User, err error) {
 
-	if user.Id != "" {
+	if user.ID != "" {
 		cpy := d.session.Copy()
 		defer cpy.Close()
 
-		if err = mgoUsersCollection(cpy).Find(bson.M{"userid": user.Id}).One(&result); err != nil {
+		if err = mgoUsersCollection(cpy).Find(bson.M{"userid": user.ID}).One(&result); err != nil {
 			return result, err
 		}
 	}
@@ -96,8 +96,8 @@ func (d MongoStoreClient) FindUsers(user *User) (results []*User, err error) {
 		MATCH = `^%s$`
 	)
 
-	if user.Id != "" {
-		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.Id})
+	if user.ID != "" {
+		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.ID})
 	}
 	if user.Username != "" {
 		//case insensitive match
@@ -119,7 +119,7 @@ func (d MongoStoreClient) FindUsers(user *User) (results []*User, err error) {
 	}
 
 	if results == nil {
-		log.Printf("no users found: query: (Id = %v) OR (Name ~= %v) OR (Emails IN %v)", user.Id, user.Username, user.Emails)
+		log.Printf("no users found: query: (ID = %v) OR (Name ~= %v) OR (Emails IN %v)", user.ID, user.Username, user.Emails)
 		results = []*User{}
 	}
 
@@ -162,7 +162,7 @@ func (d MongoStoreClient) RemoveUser(user *User) (err error) {
 	cpy := d.session.Copy()
 	defer cpy.Close()
 
-	if err = mgoUsersCollection(cpy).Remove(bson.M{"userid": user.Id}); err != nil {
+	if err = mgoUsersCollection(cpy).Remove(bson.M{"userid": user.ID}); err != nil {
 		return err
 	}
 	return nil

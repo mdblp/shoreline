@@ -3,11 +3,11 @@ package user
 type (
 	AnonIdHashPair struct {
 		Name string `json:"name"`
-		Id   string `json:"id"`
+		ID   string `json:"id"`
 		Hash string `json:"hash"`
 	}
 	IdHashPair struct {
-		Id   string `json:"id"`
+		ID   string `json:"id"`
 		Hash string `json:"hash"`
 	}
 )
@@ -22,7 +22,7 @@ func NewAnonIdHashPair(baseStrings []string, params map[string][]string) *AnonId
 	id, _ := generateUniqueHash(baseStrings, 10)
 	hash, _ := generateUniqueHash(baseStrings, 24)
 
-	return &AnonIdHashPair{Name: "", Id: id, Hash: hash}
+	return &AnonIdHashPair{Name: "", ID: id, Hash: hash}
 }
 
 func NewIdHashPair(baseStrings []string, params map[string][]string) *IdHashPair {
@@ -35,5 +35,5 @@ func NewIdHashPair(baseStrings []string, params map[string][]string) *IdHashPair
 	id, _ := generateUniqueHash(baseStrings, 10)
 	hash, _ := generateUniqueHash(baseStrings, 24)
 
-	return &IdHashPair{Id: id, Hash: hash}
+	return &IdHashPair{ID: id, Hash: hash}
 }

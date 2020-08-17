@@ -1,5 +1,4 @@
 export TIDEPOOL_SHORELINE_ENV='{
-    "hakken": { "host": "localhost:8000" },
     "gatekeeper": { "serviceSpec": { "type": "static", "hosts": ["http://localhost:9123"] } }
 }'
 
@@ -19,7 +18,7 @@ export TIDEPOOL_SHORELINE_SERVICE='{
         "apiSecret": "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
         "longTermKey": "abcdefghijklmnopqrstuvwxyz",
         "longTermDaysDuration": 30,
-        "tokenDurationSecs": 2592000,
+        "tokenDurationSecs": 86400,
         "salt": "ADihSEI7tOQQP9xfXMO9HfRpXKu1NpIJ",
         "maxFailedLogin": 5,
         "delayBeforeNextLoginAttempt": 10,
