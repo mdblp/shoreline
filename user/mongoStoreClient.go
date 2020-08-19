@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	USERS_COLLECTION  = "users"
-	TOKENS_COLLECTION = "tokens"
+	// UserCollection mongo name
+	UserCollection = "users"
+	// TokensCollection mongo name
+	TokensCollection = "tokens"
 )
 
 type MongoStoreClient struct {
@@ -35,11 +37,11 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 }
 
 func mgoUsersCollection(cpy *mgo.Session) *mgo.Collection {
-	return cpy.DB("").C(USERS_COLLECTION)
+	return cpy.DB("").C(UserCollection)
 }
 
 func mgoTokensCollection(cpy *mgo.Session) *mgo.Collection {
-	return cpy.DB("").C(TOKENS_COLLECTION)
+	return cpy.DB("").C(TokensCollection)
 }
 
 func (d MongoStoreClient) Close() {
@@ -75,7 +77,8 @@ func (d MongoStoreClient) UpsertUser(user *User) error {
 	return nil
 }
 
-func (d MongoStoreClient) FindUser(user *User) (result *User, err error) {
+// FindUserByID like it said
+func (d MongoStoreClient) FindUserByID(user *User) (result *User, err error) {
 
 	if user.ID != "" {
 		cpy := d.session.Copy()
@@ -89,7 +92,8 @@ func (d MongoStoreClient) FindUser(user *User) (result *User, err error) {
 	return result, nil
 }
 
-func (d MongoStoreClient) FindUsers(user *User) (results []*User, err error) {
+// FindUser by userid or username or email
+func (d MongoStoreClient) FindUser(user *User) (results []*User, err error) {
 
 	fieldsToMatch := []bson.M{}
 	const (
@@ -126,6 +130,7 @@ func (d MongoStoreClient) FindUsers(user *User) (results []*User, err error) {
 	return results, nil
 }
 
+// FindUsersByRole returns all user for a role
 func (d MongoStoreClient) FindUsersByRole(role string) (results []*User, err error) {
 	cpy := d.session.Copy()
 	defer cpy.Close()
@@ -142,6 +147,7 @@ func (d MongoStoreClient) FindUsersByRole(role string) (results []*User, err err
 	return results, nil
 }
 
+// FindUsersWithIds Search for a list of specific users
 func (d MongoStoreClient) FindUsersWithIds(ids []string) (results []*User, err error) {
 	cpy := d.session.Copy()
 	defer cpy.Close()

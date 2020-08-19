@@ -28,11 +28,11 @@ func (d MockStoreClient) UpsertUser(user *User) error {
 	return nil
 }
 
-func (d MockStoreClient) FindUsers(user *User) (found []*User, err error) {
+func (d MockStoreClient) FindUser(user *User) (found []*User, err error) {
 	//`find` a pretend one we just made
 
 	if d.doBad {
-		return found, errors.New("FindUsers failure")
+		return found, errors.New("FindUser failure")
 	}
 
 	password := "123youknoWm3"
@@ -85,10 +85,10 @@ func (d MockStoreClient) FindUsersWithIds(ids []string) (found []*User, err erro
 	return users, nil
 }
 
-func (d MockStoreClient) FindUser(user *User) (found *User, err error) {
+func (d MockStoreClient) FindUserByID(user *User) (found *User, err error) {
 
 	if d.doBad {
-		return found, errors.New("FindUser failure")
+		return found, errors.New("FindUserByID failure")
 	}
 	//`find` a pretend one we just made
 

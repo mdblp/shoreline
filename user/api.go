@@ -19,8 +19,6 @@ import (
 
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/status"
-	"github.com/tidepool-org/shoreline/common"
-	"github.com/tidepool-org/shoreline/oauth2"
 	"github.com/tidepool-org/shoreline/user/mailchimp"
 	"github.com/tidepool-org/shoreline/user/marketo"
 
@@ -149,7 +147,6 @@ type (
 		Store            Storage
 		ApiConfig        ApiConfig
 		perms            clients.Gatekeeper
-		oauth            oauth2.Client
 		logger           *log.Logger
 		auditLogger      *log.Logger
 		mailchimpManager mailchimp.Manager
@@ -270,40 +267,32 @@ func (a *Api) AttachPerms(perms clients.Gatekeeper) {
 	a.perms = perms
 }
 
-func (a *Api) AttachOauth(client oauth2.Client) {
-	a.oauth = client
-}
-
 func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 	rtr.Handle("/metrics", promhttp.Handler())
 
-	rtr.HandleFunc("/status", a.GetStatus).Methods("GET")
+	rtr.HandleFunc("/status", a.GetStatus).Methods(http.MethodGet)
 
-	rtr.HandleFunc("/users", a.GetUsers).Methods("GET")
+	rtr.HandleFunc("/users", a.GetUsers).Methods(http.MethodGet)
 
-	rtr.Handle("/user", varsHandler(a.GetUserInfo)).Methods("GET")
-	rtr.Handle("/user/{userid}", varsHandler(a.GetUserInfo)).Methods("GET")
+	rtr.Handle("/user", varsHandler(a.GetUserInfo)).Methods(http.MethodGet)
+	rtr.Handle("/user/{userid}", varsHandler(a.GetUserInfo)).Methods(http.MethodGet)
 
-	rtr.HandleFunc("/user", a.CreateUser).Methods("POST")
-	rtr.Handle("/user", varsHandler(a.UpdateUser)).Methods("PUT")
-	rtr.Handle("/user/{userid}", varsHandler(a.UpdateUser)).Methods("PUT")
-	rtr.Handle("/user/{userid}", varsHandler(a.DeleteUser)).Methods("DELETE")
+	rtr.HandleFunc("/user", a.CreateUser).Methods(http.MethodPost)
+	rtr.Handle("/user", varsHandler(a.UpdateUser)).Methods(http.MethodPut)
+	rtr.Handle("/user/{userid}", varsHandler(a.UpdateUser)).Methods(http.MethodPut)
+	rtr.Handle("/user/{userid}", varsHandler(a.DeleteUser)).Methods(http.MethodDelete)
 
-	rtr.Handle("/user/{userid}/user", varsHandler(a.CreateCustodialUser)).Methods("POST")
+	rtr.Handle("/user/{userid}/user", varsHandler(a.CreateCustodialUser)).Methods(http.MethodPost)
 
-	rtr.HandleFunc("/login", a.Login).Methods("POST")
-	rtr.HandleFunc("/login", a.RefreshSession).Methods("GET")
-	rtr.Handle("/login/{longtermkey}", varsHandler(a.LongtermLogin)).Methods("POST")
+	rtr.HandleFunc("/login", a.Login).Methods(http.MethodPost)
+	rtr.HandleFunc("/login", a.RefreshSession).Methods(http.MethodGet)
+	rtr.Handle("/login/{longtermkey}", varsHandler(a.LongtermLogin)).Methods(http.MethodPost)
 
-	rtr.HandleFunc("/oauthlogin", a.oauth2Login).Methods("POST")
+	rtr.HandleFunc("/serverlogin", a.ServerLogin).Methods(http.MethodPost)
 
-	rtr.HandleFunc("/serverlogin", a.ServerLogin).Methods("POST")
+	rtr.Handle("/token/{token}", varsHandler(a.ServerCheckToken)).Methods(http.MethodGet)
 
-	rtr.Handle("/token/{token}", varsHandler(a.ServerCheckToken)).Methods("GET")
-
-	rtr.HandleFunc("/logout", a.Logout).Methods("POST")
-
-	rtr.HandleFunc("/private", a.AnonymousIdHashPair).Methods("GET")
+	rtr.HandleFunc("/logout", a.Logout).Methods(http.MethodPost)
 }
 
 func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -338,7 +327,8 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 	return
 }
 
-// @Summary Get users
+// GetUsers server tokens only
+// @Summary Get users, server tokens only
 // @Description Get users
 // @ID shoreline-user-api-getusers
 // @Accept  json
@@ -411,7 +401,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
-	} else if existingUser, err := a.Store.FindUsers(newUser); err != nil {
+	} else if existingUser, err := a.Store.FindUser(newUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingUser) != 0 {
@@ -463,7 +453,7 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 	} else if newCustodialUser, err := NewCustodialUser(newCustodialUserDetails, a.ApiConfig.Salt); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
-	} else if existingCustodialUser, err := a.Store.FindUsers(newCustodialUser); err != nil {
+	} else if existingCustodialUser, err := a.Store.FindUser(newCustodialUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 
 	} else if len(existingCustodialUser) != 0 {
@@ -509,7 +499,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 	} else if err := updateUserDetails.Validate(); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
-	} else if originalUser, err := a.Store.FindUser(&User{ID: firstStringNotEmpty(vars["userid"], tokenData.UserID)}); err != nil {
+	} else if originalUser, err := a.Store.FindUserByID(&User{ID: firstStringNotEmpty(vars["userid"], tokenData.UserID)}); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 	} else if originalUser == nil {
@@ -543,7 +533,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				dupCheck.Emails = updatedUser.Emails
 			}
 
-			if results, err := a.Store.FindUsers(dupCheck); err != nil {
+			if results, err := a.Store.FindUser(dupCheck); err != nil {
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 				return
 			} else if len(results) == 1 && results[0].ID != firstStringNotEmpty(vars["userid"], tokenData.UserID) {
@@ -632,7 +622,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			user = &User{ID: tokenData.UserID}
 		}
 
-		if results, err := a.Store.FindUsers(user); err != nil {
+		if results, err := a.Store.FindUser(user); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
 		} else if len(results) == 0 {
@@ -746,7 +736,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	if code != http.StatusOK {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.totalInProgress))
 
-	} else if results, err := a.Store.FindUsers(user); err != nil {
+	} else if results, err := a.Store.FindUser(user); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, STATUS_USER_NOT_FOUND, err)
 
 	} else if len(results) != 1 {
@@ -861,72 +851,6 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	// If the password given at the door is wrong, we cannot generate the token
 	a.logger.Println(http.StatusUnauthorized, STATUS_PW_WRONG)
 	sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_PW_WRONG), http.StatusUnauthorized)
-	return
-}
-
-// @Summary Login oauth2
-// @Description Login oauth2
-// @ID shoreline-user-api-oauth2login
-// @Accept  json
-// @Produce  json
-// @Success 200 {string} string  "generic json format { \"oauthUser\" : fndUsr, \"oauthTarget\" : result[\"authUserId\"] }"
-// @Header 200 {string} x-tidepool-session-token "authentication token"
-// @Failure 503 {string} string ""
-// @Failure 401 {string} string "generic json format { \"error\" : errorMsg }"
-// @Failure 400 {string} string "generic json format { \"error\" : errorMsg }"
-// @Router /oauthlogin [post]
-func (a *Api) oauth2Login(w http.ResponseWriter, r *http.Request) {
-
-	//oauth is not enabled
-	if a.oauth == nil {
-		a.logger.Println(http.StatusServiceUnavailable, "OAuth is not enabled")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
-
-	if ah := r.Header.Get("Authorization"); ah != "" {
-		if len(ah) > 6 && strings.ToUpper(ah[0:6]) == "BEARER" {
-			if auth_token := ah[7:]; auth_token != "" {
-
-				//check the actual token
-				result, err := a.oauth.CheckToken(auth_token)
-				if err != nil || result == nil {
-					a.logger.Println(http.StatusUnauthorized, "oauth2Login error checking token ", err)
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-
-				//check the corresponding user
-				fndUsr, errUsr := a.Store.FindUser(&User{ID: result["userId"].(string)})
-				if errUsr != nil || fndUsr == nil {
-					a.logger.Println(http.StatusUnauthorized, "oauth2Login error getting user ", errUsr.Error())
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-
-				//generate token and send the response
-				if sessionToken, err := createSessionTokenAndSave(
-					&TokenData{DurationSecs: 0, UserID: result["userId"].(string), IsServer: false},
-					TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
-					a.Store,
-				); err != nil {
-					a.logger.Println(http.StatusUnauthorized, "oauth2Login error creating session token", err.Error())
-					common.OutputJSON(w, http.StatusUnauthorized, map[string]interface{}{"error": "invalid_token"})
-					return
-				} else {
-					//We are redirecting to the app
-					w.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-					common.OutputJSON(w, http.StatusOK, map[string]interface{}{"oauthUser": fndUsr, "oauthTarget": result["authUserId"]})
-					return
-				}
-			}
-		}
-		a.logger.Println(http.StatusUnauthorized, STATUS_AUTH_HEADER_INVLAID)
-		common.OutputJSON(w, http.StatusUnauthorized, map[string]interface{}{"error": STATUS_AUTH_HEADER_INVLAID})
-		return
-	}
-	a.logger.Println(http.StatusBadRequest, STATUS_AUTH_HEADER_REQUIRED)
-	common.OutputJSON(w, http.StatusBadRequest, map[string]interface{}{"error": STATUS_AUTH_HEADER_REQUIRED})
 	return
 }
 
@@ -1052,19 +976,6 @@ func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 	// otherwise all good
 	a.logAudit(req, nil, "Logout")
 	res.WriteHeader(http.StatusOK)
-	return
-}
-
-// @Summary AnonymousIdHashPair ?
-// @Description AnonymousIdHashPair ?
-// @ID shoreline-user-api-anonymousidhashpair
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} user.AnonIdHashPair "AnonymousIdHashPair?"
-// @Router /private [get]
-func (a *Api) AnonymousIdHashPair(res http.ResponseWriter, req *http.Request) {
-	idHashPair := NewAnonIdHashPair([]string{a.ApiConfig.Salt}, req.URL.Query())
-	sendModelAsRes(res, idHashPair)
 	return
 }
 

@@ -15,7 +15,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/version"
 
-	"github.com/tidepool-org/shoreline/oauth2"
 	"github.com/tidepool-org/shoreline/user/marketo"
 )
 
@@ -1614,110 +1612,6 @@ func TestServerLogin_StatusUnauthorized_WhenSecretWrong(t *testing.T) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (m *MockOAuth) CheckToken(token string) (oauth2.Data, error) {
-	d := oauth2.Data{}
-	d["userId"] = "1234"
-	d["authUserId"] = "4567"
-	return d, nil
-}
-
-func Test_oauth2Login(t *testing.T) {
-	r, _ := http.NewRequest("POST", "/", nil)
-	w := httptest.NewRecorder()
-	shoreline.SetHandlers("", rtr)
-
-	//add mock
-	mock := &MockOAuth{}
-	shoreline.AttachOauth(mock)
-
-	//no header passed
-	shoreline.oauth2Login(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusInternalServerError, w.Code)
-	}
-
-	//with header but no token
-	r.Header.Set("Authorization", "bearer")
-	wHeader := httptest.NewRecorder()
-	shoreline.oauth2Login(wHeader, r)
-
-	if wHeader.Code != http.StatusUnauthorized {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, wHeader.Code)
-	}
-
-	//req now sets header
-}
-
-func Test_oauth2Login_noheader(t *testing.T) {
-	r, _ := http.NewRequest("POST", "/", nil)
-	w := httptest.NewRecorder()
-	shoreline.SetHandlers("", rtr)
-
-	//add mock
-	mock := &MockOAuth{}
-	shoreline.AttachOauth(mock)
-
-	//no header passed
-	shoreline.oauth2Login(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusInternalServerError, w.Code)
-	}
-
-}
-func Test_oauth2Login_invalid_header(t *testing.T) {
-	r, _ := http.NewRequest("POST", "/", nil)
-	//add mock
-	mock := &MockOAuth{}
-	shoreline.AttachOauth(mock)
-	//with header but no token
-	r.Header.Set("Authorization", "bearer")
-	wHeader := httptest.NewRecorder()
-	shoreline.oauth2Login(wHeader, r)
-
-	if wHeader.Code != http.StatusUnauthorized {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, wHeader.Code)
-	}
-
-	//req now sets header
-}
-func Test_oauth2Login_validheader(t *testing.T) {
-	r, _ := http.NewRequest("POST", "/", nil)
-	//add mock
-	mock := &MockOAuth{}
-	shoreline.AttachOauth(mock)
-	//with header but no token
-	r.Header.Set("Authorization", "bearer xxx")
-	wHeader := httptest.NewRecorder()
-	shoreline.oauth2Login(wHeader, r)
-
-	if wHeader.Code != http.StatusOK {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, wHeader.Code)
-	}
-
-	if wHeader.Header().Get(TP_SESSION_TOKEN) == "" {
-		t.Fatal("Expected the TP_SESSION_TOKEN header to be attached")
-	}
-
-	// parse output json
-	output := make(map[string]interface{})
-	if err := json.Unmarshal(wHeader.Body.Bytes(), &output); err != nil {
-		t.Fatalf("Could not decode output json: %s", err)
-	}
-
-	if output["oauthUser"] == nil {
-		t.Fatalf("we need to be given a user id but got %v", output)
-	}
-
-	if output["oauthTarget"] == nil {
-		t.Fatalf("we need to be given a user id but got %v", output)
-	}
-
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 func TestRefreshSession_StatusUnauthorized_WithNoToken(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/", nil)
 	response := httptest.NewRecorder()
@@ -2051,134 +1945,6 @@ func TestLogout_Failure(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, resp.Code)
 	}
-}
-
-func TestAnonymousIdHashPair_StatusOK(t *testing.T) {
-	request, _ := http.NewRequest("GET", "/", nil)
-
-	values := request.URL.Query()
-	values.Add("one", "somestuff")
-	values.Add("two", "some more stuff")
-	request.URL.RawQuery = values.Encode()
-
-	response := httptest.NewRecorder()
-
-	shoreline.SetHandlers("", rtr)
-
-	shoreline.AnonymousIdHashPair(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
-	}
-
-	if response.Header().Get("content-type") != "application/json" {
-		t.Fatal("the resp should be json")
-	}
-
-	body, _ := ioutil.ReadAll(response.Body)
-
-	var anonIDHashPair AnonIdHashPair
-	_ = json.Unmarshal(body, &anonIDHashPair)
-
-	if anonIDHashPair.Name != "" {
-		t.Fatalf("should have no name but was %v", anonIDHashPair.Name)
-	}
-	if anonIDHashPair.ID == "" {
-		t.Fatalf("should have an ID but was %v", anonIDHashPair.ID)
-	}
-	if anonIDHashPair.Hash == "" {
-		t.Fatalf("should have an Hash but was %v", anonIDHashPair.Hash)
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func TestAnonymousIdHashPair_StatusOK_EvenWhenNoURLParams(t *testing.T) {
-	request, _ := http.NewRequest("GET", "/", nil)
-
-	response := httptest.NewRecorder()
-
-	shoreline.SetHandlers("", rtr)
-
-	shoreline.AnonymousIdHashPair(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
-	}
-
-	if response.Header().Get("content-type") != "application/json" {
-		t.Fatal("the resp should be json")
-	}
-
-	body, _ := ioutil.ReadAll(response.Body)
-
-	var anonIDHashPair AnonIdHashPair
-	_ = json.Unmarshal(body, &anonIDHashPair)
-
-	if anonIDHashPair.Name != "" {
-		t.Fatalf("should have no name but was %v", anonIDHashPair.Name)
-	}
-	if anonIDHashPair.ID == "" {
-		t.Fatalf("should have an ID but was %v", anonIDHashPair.ID)
-	}
-	if anonIDHashPair.Hash == "" {
-		t.Fatalf("should have an Hash but was %v", anonIDHashPair.Hash)
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func TestAnonIdHashPair_InBulk(t *testing.T) {
-
-	shoreline.SetHandlers("", rtr)
-
-	// we ask for 100 AnonymousIdHashPair to be created
-	//NOTE: while we can run more loaccly travis dosen't like it so 100 should be good enough
-	ask := make([]AnonIdHashPair, 100)
-	var generated []AnonIdHashPair
-
-	var mutex sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, hash := range ask {
-		wg.Add(1)
-		go func(hash AnonIdHashPair) {
-			defer wg.Done()
-			req, _ := http.NewRequest("GET", "/", nil)
-			res := httptest.NewRecorder()
-			shoreline.AnonymousIdHashPair(res, req)
-			body, _ := ioutil.ReadAll(res.Body)
-			json.Unmarshal(body, &hash)
-			mutex.Lock()
-			generated = append(generated, hash)
-			mutex.Unlock()
-		}(hash)
-
-	}
-	wg.Wait()
-
-	// need a more elogent way for this
-	id1 := generated[1].ID
-	matches1 := 0
-
-	id33 := generated[33].ID
-	matches33 := 0
-
-	for i := range generated {
-		if id1 == generated[i].ID {
-			matches1++
-		}
-		if id33 == generated[i].ID {
-			matches33++
-		}
-	}
-
-	if matches1 > 1 || matches33 > 1 {
-		t.Log("id: ", id1, "has ", matches1, "matches")
-		t.Log("id: ", id33, "has ", matches33, "matches")
-		t.Fatal("Hashed Ids should be unique")
-	}
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -87,7 +87,7 @@ func (r *ResponsableMockStoreClient) UpsertUser(user *User) (err error) {
 	panic("UpsertUserResponses unavailable")
 }
 
-func (r *ResponsableMockStoreClient) FindUsers(user *User) (found []*User, err error) {
+func (r *ResponsableMockStoreClient) FindUser(user *User) (found []*User, err error) {
 	if len(r.FindUsersResponses) > 0 {
 		var response FindUsersResponse
 		response, r.FindUsersResponses = r.FindUsersResponses[0], r.FindUsersResponses[1:]
@@ -114,7 +114,7 @@ func (r *ResponsableMockStoreClient) FindUsersWithIds(ids []string) (found []*Us
 	panic("FindUsersWithIdsResponses unavailable")
 }
 
-func (r *ResponsableMockStoreClient) FindUser(user *User) (found *User, err error) {
+func (r *ResponsableMockStoreClient) FindUserByID(user *User) (found *User, err error) {
 	if len(r.FindUserResponses) > 0 {
 		var response FindUserResponse
 		response, r.FindUserResponses = r.FindUserResponses[0], r.FindUserResponses[1:]

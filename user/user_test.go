@@ -500,7 +500,7 @@ func Test_NewUser_Valid(t *testing.T) {
 	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
-	if user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
+	if user.TermsAccepted != "" || user.EmailVerified {
 		t.Fatalf("Found fields that not should be present on success")
 	}
 }
@@ -721,7 +721,7 @@ func Test_NewCustodialUser_ValidAll(t *testing.T) {
 	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
-	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
+	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified {
 		t.Fatalf("Found fields that not should be present on success")
 	}
 }
@@ -742,7 +742,7 @@ func Test_NewCustodialUser_ValidNone(t *testing.T) {
 	if user.ID == "" {
 		t.Fatalf("Missing fields that should be present on success")
 	}
-	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
+	if user.PwHash != "" || user.TermsAccepted != "" || user.EmailVerified {
 		t.Fatalf("Found fields that not should be present on success")
 	}
 }
@@ -1285,7 +1285,6 @@ func Test_User_DeepClone(t *testing.T) {
 		TermsAccepted: "2016-01-01T12:34:56-08:00",
 		EmailVerified: true,
 		PwHash:        "this-is-the-password-hash",
-		Private:       map[string]*IdHashPair{"a": &IdHashPair{"1", "2"}, "b": &IdHashPair{"3", "4"}},
 	}
 	clonedUser := user.DeepClone()
 	if !reflect.DeepEqual(user, clonedUser) {
