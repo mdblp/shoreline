@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli/v2"
 
 	"github.com/tidepool-org/go-common/clients/shoreline"
 )
@@ -32,22 +32,26 @@ func main() {
 	app.Name = "User Roles"
 	app.Usage = "Manage user roles"
 	app.Version = "0.0.1"
-	app.Author = "Jamie"
-	app.Email = "jamie@tidepool.org"
+	app.Authors = []*cli.Author{
+		{
+			Name:  "Jamie",
+			Email: "jamie@tidepool.org",
+		},
+	}
 
 	const environmentUsage = "Target environment (one of: \"prd\", \"stg\", \"dev\", \"local\")"
 
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
-			Name:      "find",
-			ShortName: "f",
-			Usage:     "Find all users assigned a role",
+			Name:    "find",
+			Aliases: []string{"f"},
+			Usage:   "Find all users assigned a role",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "role",
 					Usage: "Role to search for (one of: \"clinic\")",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "env",
 					Usage: environmentUsage,
 				},
@@ -55,19 +59,19 @@ func main() {
 			Action: findUsersWithRole,
 		},
 		{
-			Name:      "add",
-			ShortName: "a",
-			Usage:     "Add the specified role to an existing user found by email",
+			Name:    "add",
+			Aliases: []string{"a"},
+			Usage:   "Add the specified role to an existing user found by email",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "email",
 					Usage: "Email address for the user",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "role",
 					Usage: "Role to add to the user (one of: \"clinic\")",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "env",
 					Usage: environmentUsage,
 				},
@@ -75,19 +79,19 @@ func main() {
 			Action: addRoleToUser,
 		},
 		{
-			Name:      "remove",
-			ShortName: "r",
-			Usage:     "Remove the specified role from an existing user found by email",
+			Name:    "remove",
+			Aliases: []string{"r"},
+			Usage:   "Remove the specified role from an existing user found by email",
 			Flags: []cli.Flag{
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "email",
 					Usage: "Email address for the user",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "role",
 					Usage: "Role to remove from the user (one of: \"clinic\")",
 				},
-				cli.StringFlag{
+				&cli.StringFlag{
 					Name:  "env",
 					Usage: environmentUsage,
 				},
@@ -104,32 +108,42 @@ func die(err error) {
 	os.Exit(1)
 }
 
-func findUsersWithRole(c *cli.Context) {
-	if a, err := NewAdmin(c.String("env")); err != nil {
-		die(err)
-	} else if users, err := a.GetUsersWithRole(c.String("role")); err != nil {
-		die(err)
-	} else {
-		for _, user := range users {
-			dumpUser(&user)
-		}
+func findUsersWithRole(c *cli.Context) error {
+	var err error
+	var a *admin
+	var users []shoreline.UserData
+
+	if a, err = NewAdmin(c.String("env")); err != nil {
+		return err
 	}
+	if users, err = a.GetUsersWithRole(c.String("role")); err != nil {
+		return err
+	}
+
+	for _, user := range users {
+		dumpUser(&user)
+	}
+	return nil
 }
 
-func addRoleToUser(c *cli.Context) {
-	if updater, err := NewAddUserRoleUpdater(c.String("role")); err != nil {
-		die(err)
-	} else {
-		applyUpdatesToUser(c, []UserUpdater{updater})
+func addRoleToUser(c *cli.Context) error {
+	var updater *AddUserRoleUpdater
+	var err error
+	if updater, err = NewAddUserRoleUpdater(c.String("role")); err != nil {
+		return err
 	}
+	applyUpdatesToUser(c, []UserUpdater{updater})
+	return nil
 }
 
-func removeRoleFromUser(c *cli.Context) {
-	if updater, err := NewRemoveUserRoleUpdater(c.String("role")); err != nil {
-		die(err)
-	} else {
-		applyUpdatesToUser(c, []UserUpdater{updater})
+func removeRoleFromUser(c *cli.Context) error {
+	var updater *RemoveUserRoleUpdater
+	var err error
+	if updater, err = NewRemoveUserRoleUpdater(c.String("role")); err != nil {
+		return err
 	}
+	applyUpdatesToUser(c, []UserUpdater{updater})
+	return nil
 }
 
 func applyUpdatesToUser(c *cli.Context, updaters []UserUpdater) {
@@ -375,22 +389,26 @@ func (a *admin) urlWithHost(path string) string {
 
 func envToHost(env string) (string, error) {
 	switch env {
-	case "prd":
-		return "https://api.tidepool.org", nil
-	case "int":
-		return "https://int-api.tidepool.org", nil
-	case "stg":
-		return "https://stg-api.tidepool.org", nil
-	case "dev":
-		return "https://dev-api.tidepool.org", nil
-	case "dev-clinic":
-		return "https://dev-clinic-api.tidepool.org", nil
+	// case "prd":
+	// 	return "https://api.tidepool.org", nil
+	// case "int":
+	// 	return "https://int-api.tidepool.org", nil
+	// case "stg":
+	// 	return "https://stg-api.tidepool.org", nil
+	// case "dev":
+	// 	return "https://dev-api.tidepool.org", nil
+	// case "dev-clinic":
+	// 	return "https://dev-clinic-api.tidepool.org", nil
 	case "local":
 		return "http://localhost:8009", nil
 	case "":
 		return "", errors.New("Environment not specified")
 	default:
-		return "", errors.New(fmt.Sprintf("Invalid environment: %s", env))
+		url := os.Getenv("SHORELINE_HOST")
+		if url == "" {
+			return "", fmt.Errorf("Invalid or missing environment var SHORELINE_HOST")
+		}
+		return url, nil
 	}
 }
 

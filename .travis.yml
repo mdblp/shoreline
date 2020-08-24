@@ -5,14 +5,14 @@ language: go
 dist: bionic
 
 go:
-  - 1.12.7
+  - 1.14.x
 
 go_import_path: github.com/mdblp/shoreline
 
 env:
   # Using Go module (go 1.12 need this variable to be set to enable modules)
   # The variable should default to "on", in Go 1.14 release
-  global: 
+  global:
     - GO111MODULE=on
     - BUILD_OPENAPI_DOC=true
     - BUILD_SOUP=true

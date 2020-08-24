@@ -30,14 +30,14 @@ func mgoTestSetup() (*MongoStoreClient, error) {
 func TestMongoStoreUserOperations(t *testing.T) {
 
 	var (
-		usernameOriginal     = "test@foo.bar"
-		usernameOther        = "other@foo.bar"
-		password             = "myT35ter"
-		original_user_detail = &NewUserDetails{Username: &usernameOriginal, Emails: []string{usernameOriginal}, Password: &password}
-		other_user_detail    = &NewUserDetails{Username: &usernameOther, Emails: original_user_detail.Emails, Password: &password}
+		usernameOriginal   = "test@foo.bar"
+		usernameOther      = "other@foo.bar"
+		password           = "myT35ter"
+		originalUserDetail = &NewUserDetails{Username: &usernameOriginal, Emails: []string{usernameOriginal}, Password: &password}
+		otherUserDetail    = &NewUserDetails{Username: &usernameOther, Emails: originalUserDetail.Emails, Password: &password}
 	)
 
-	const tests_fake_salt = "some fake salt for the tests"
+	const testsFakeSalt = "some fake salt for the tests"
 
 	mc, err := mgoTestSetup()
 	if err != nil {
@@ -47,7 +47,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	/*
 	 * THE TESTS
 	 */
-	user, err := NewUser(original_user_detail, tests_fake_salt)
+	user, err := NewUser(originalUserDetail, testsFakeSalt)
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -65,7 +65,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	if found, err := mc.FindUser(toFindByOriginalName); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
-		if len(found) > 0 && found[0].Username != toFindByOriginalName.Username && found[0].Username != *original_user_detail.Username {
+		if len(found) > 0 && found[0].Username != toFindByOriginalName.Username && found[0].Username != *originalUserDetail.Username {
 			t.Fatalf("the user we found doesn't match what we asked for %v", found)
 		}
 	}
@@ -147,7 +147,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	}
 
 	//Find many By Email - user and userTwo have the same emails addresses
-	userTwo, err := NewUser(other_user_detail, tests_fake_salt)
+	userTwo, err := NewUser(otherUserDetail, testsFakeSalt)
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -170,12 +170,12 @@ func TestMongoStoreUserOperations(t *testing.T) {
 func TestMongoStore_FindUsersByRole(t *testing.T) {
 
 	var (
-		tests_fake_salt = "some fake salt for the tests"
-		user_one_name   = "test@foo.bar"
-		user_two_name   = "test_two@foo.bar"
-		user_pw         = "my0th3rT35t"
-		user_one_detail = &NewUserDetails{Username: &user_one_name, Emails: []string{user_one_name}, Password: &user_pw}
-		user_two_detail = &NewUserDetails{Username: &user_two_name, Emails: []string{user_two_name}, Password: &user_pw}
+		testsFakeSalt = "some fake salt for the tests"
+		userOneName   = "test@foo.bar"
+		userTwoName   = "test_two@foo.bar"
+		userPw        = "my0th3rT35t"
+		userOneDetail = &NewUserDetails{Username: &userOneName, Emails: []string{userOneName}, Password: &userPw}
+		userTwoDetail = &NewUserDetails{Username: &userTwoName, Emails: []string{userTwoName}, Password: &userPw}
 	)
 
 	mc, err := mgoTestSetup()
@@ -186,10 +186,10 @@ func TestMongoStore_FindUsersByRole(t *testing.T) {
 	/*
 	 * THE TESTS
 	 */
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
+	userOne, _ := NewUser(userOneDetail, testsFakeSalt)
 	userOne.Roles = append(userOne.Roles, "clinic")
 
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	userTwo, _ := NewUser(userTwoDetail, testsFakeSalt)
 
 	if err := mc.UpsertUser(userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)
@@ -209,12 +209,12 @@ func TestMongoStore_FindUsersByRole(t *testing.T) {
 func TestMongoStore_FindUsersById(t *testing.T) {
 
 	var (
-		tests_fake_salt = "some fake salt for the tests"
-		user_one_name   = "test@foo.bar"
-		user_two_name   = "test_two@foo.bar"
-		user_pw         = "my0th3rT35t"
-		user_one_detail = &NewUserDetails{Username: &user_one_name, Emails: []string{user_one_name}, Password: &user_pw}
-		user_two_detail = &NewUserDetails{Username: &user_two_name, Emails: []string{user_two_name}, Password: &user_pw}
+		testsFakeSalt = "some fake salt for the tests"
+		userOneName   = "test@foo.bar"
+		userTwoName   = "test_two@foo.bar"
+		userPw        = "my0th3rT35t"
+		userOneDetail = &NewUserDetails{Username: &userOneName, Emails: []string{userOneName}, Password: &userPw}
+		userTwoDetail = &NewUserDetails{Username: &userTwoName, Emails: []string{userTwoName}, Password: &userPw}
 	)
 
 	mc, err := mgoTestSetup()
@@ -225,8 +225,8 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 	/*
 	 * THE TESTS
 	 */
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	userOne, _ := NewUser(userOneDetail, testsFakeSalt)
+	userTwo, _ := NewUser(userTwoDetail, testsFakeSalt)
 
 	if err := mc.UpsertUser(userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)
@@ -252,49 +252,4 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 	} else if len(found) != 2 || found[0].ID != userOne.ID || found[1].ID != userTwo.ID {
 		t.Fatalf("should only find user ID %s but found %v", userTwo.ID, found)
 	}
-}
-
-func TestMongoStoreTokenOperations(t *testing.T) {
-
-	testing_token_data := &TokenData{UserID: "2341", IsServer: true, DurationSecs: 3600}
-	testing_token_config := TokenConfig{DurationSecs: 1200, Secret: "some secret for the tests"}
-
-	mc, err := mgoTestSetup()
-	if err != nil {
-		t.Fatalf("we initialise the test store %s", err.Error())
-	}
-
-	/*
-	 * THE TESTS
-	 */
-	sessionToken, _ := CreateSessionToken(
-		testing_token_data,
-		testing_token_config,
-	)
-
-	if err := mc.AddToken(sessionToken); err != nil {
-		t.Fatalf("we could not save the token %v", err)
-	}
-
-	if foundToken, err := mc.FindTokenByID(sessionToken.ID); err == nil {
-		if foundToken.ID == "" {
-			t.Fatalf("the token string isn't included %v", foundToken)
-		}
-		if foundToken.IssuedAt == 0 {
-			t.Fatalf("the time wasn't included %v", foundToken)
-		}
-	} else {
-		t.Fatalf("no token was returned when it should have been - err[%v]", err)
-	}
-
-	if err := mc.RemoveTokenByID(sessionToken.ID); err != nil {
-		t.Fatalf("we could not remove the token %v", err)
-	}
-
-	if token, err := mc.FindTokenByID(sessionToken.ID); err == nil {
-		if token != nil {
-			t.Fatalf("the token has been removed so we shouldn't find it %v", token)
-		}
-	}
-
 }

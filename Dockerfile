@@ -1,5 +1,5 @@
 # Development
-FROM golang:1.12-alpine AS development
+FROM golang:1.14-alpine AS development
 # Using Go module (go 1.12 need this variable to be set to enable modules)
 # The variable should default to "on", in Go 1.14 release
 ENV GO111MODULE on
@@ -22,5 +22,5 @@ RUN apk --no-cache update && \
     apk add --no-cache ca-certificates && \
     adduser -D tidepool
 USER tidepool
-COPY --from=development --chown=root /go/src/github.com/tidepool-org/shoreline/dist/shoreline .
+COPY --from=development --chown=root:root /go/src/github.com/tidepool-org/shoreline/dist/shoreline .
 ENTRYPOINT ["/app/shoreline"]

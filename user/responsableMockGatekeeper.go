@@ -52,6 +52,11 @@ func (c *ResponsableMockGatekeeper) UsersInGroup(groupID string) (clients.UsersP
 	panic("UsersInGroupResponses unavailable")
 }
 
+// returns the map of user id to Permissions
+func (c *ResponsableMockGatekeeper) GroupsForUser(userID string) (clients.UsersPermissions, error) {
+	panic("GroupsForUser unavailable")
+}
+
 func (c *ResponsableMockGatekeeper) SetPermissions(userID, groupID string, permissions clients.Permissions) (clients.Permissions, error) {
 	if len(c.SetPermissionsResponses) > 0 {
 		var response PermissionsResponse

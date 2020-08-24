@@ -120,12 +120,6 @@ func createSessionTokenAndSave(data *TokenData, config TokenConfig, store Storag
 	if err != nil {
 		return nil, err
 	}
-
-	err = store.AddToken(sessionToken)
-	if err != nil {
-		return nil, err
-	}
-
 	return sessionToken, nil
 }
 
@@ -133,19 +127,19 @@ func unpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if id == "" {
 		return nil, errSessionTokenErrorNoUserID
 	}
-
 	keyFunc := func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
 	}
 
-	jwtToken, err := jwt.ParseWithClaims(id, &tokenClaims{}, keyFunc)
+	parser := new(jwt.Parser)
+	parser.ValidMethods = []string{tokenSignMethod}
+	parser.SkipClaimsValidation = false
+	parser.UseJSONNumber = true
+	jwtToken, err := parser.ParseWithClaims(id, &tokenClaims{}, keyFunc)
 	if err != nil {
 		return nil, err
 	}
 	if !jwtToken.Valid {
-		return nil, errSessionTokenInvalid
-	}
-	if jwtToken.Method.Alg() != tokenSignMethod {
 		return nil, errSessionTokenInvalid
 	}
 

@@ -6,8 +6,8 @@ export GO111MODULE=on
 
 # generate version number
 if [ -n "${TRAVIS_TAG:-}" ]; then
-    VERSION_BASE=${TRAVIS_TAG}  
-else 
+    VERSION_BASE=${TRAVIS_TAG}
+else
     VERSION_BASE=$(git describe --abbrev=0 --tags 2> /dev/null || echo 'dblp.0.0.0')
 fi
 VERSION_SHORT_COMMIT=$(git rev-parse --short HEAD)

@@ -15,8 +15,6 @@ import (
 const (
 	// UserCollection mongo name
 	UserCollection = "users"
-	// TokensCollection mongo name
-	TokensCollection = "tokens"
 )
 
 type MongoStoreClient struct {
@@ -38,10 +36,6 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 
 func mgoUsersCollection(cpy *mgo.Session) *mgo.Collection {
 	return cpy.DB("").C(UserCollection)
-}
-
-func mgoTokensCollection(cpy *mgo.Session) *mgo.Collection {
-	return cpy.DB("").C(TokensCollection)
 }
 
 func (d MongoStoreClient) Close() {
@@ -171,39 +165,5 @@ func (d MongoStoreClient) RemoveUser(user *User) (err error) {
 	if err = mgoUsersCollection(cpy).Remove(bson.M{"userid": user.ID}); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (d MongoStoreClient) AddToken(st *SessionToken) error {
-	cpy := d.session.Copy()
-	defer cpy.Close()
-
-	if _, err := mgoTokensCollection(cpy).Upsert(bson.M{"_id": st.ID}, st); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d MongoStoreClient) FindTokenByID(id string) (*SessionToken, error) {
-	cpy := d.session.Copy()
-	defer cpy.Close()
-
-	sessionToken := &SessionToken{}
-	if err := mgoTokensCollection(cpy).Find(bson.M{"_id": id}).One(&sessionToken); err != nil {
-		return nil, err
-	}
-
-	return sessionToken, nil
-}
-
-func (d MongoStoreClient) RemoveTokenByID(id string) (err error) {
-	cpy := d.session.Copy()
-	defer cpy.Close()
-
-	if err = mgoTokensCollection(cpy).Remove(bson.M{"_id": id}); err != nil {
-		return err
-	}
-
 	return nil
 }

@@ -689,10 +689,6 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 			if err = a.Store.RemoveUser(toDelete); err == nil {
 
 				a.logAudit(req, td, "DeleteUser")
-				//cleanup if any
-				if td.IsServer == false {
-					a.Store.RemoveTokenByID(req.Header.Get(TP_SESSION_TOKEN))
-				}
 				//all good
 				res.WriteHeader(http.StatusAccepted)
 				return
@@ -968,9 +964,9 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 	if id := req.Header.Get(TP_SESSION_TOKEN); id != "" {
-		if err := a.Store.RemoveTokenByID(id); err != nil {
-			//silently fail but still log it
-			a.logger.Println("Logout was unable to delete token", err.Error())
+		td, err := unpackSessionTokenAndVerify(id, a.ApiConfig.Secret)
+		if err != nil {
+			a.logger.Println("Try to logout an invalid token: %s (%v)", err, td)
 		}
 	}
 	// otherwise all good
@@ -1085,8 +1081,6 @@ func (a *Api) authenticateSessionToken(sessionToken string) (*TokenData, error) 
 	if sessionToken == "" {
 		return nil, errors.New("Session token is empty")
 	} else if tokenData, err := unpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
-		return nil, err
-	} else if _, err := a.Store.FindTokenByID(sessionToken); err != nil {
 		return nil, err
 	} else {
 		return tokenData, nil
