@@ -93,20 +93,6 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	return sessionToken, nil
 }
 
-func CreateSessionTokenAndSave(data *TokenData, config TokenConfig, store Storage) (*SessionToken, error) {
-	sessionToken, err := CreateSessionToken(data, config)
-	if err != nil {
-		return nil, err
-	}
-
-	err = store.AddToken(sessionToken)
-	if err != nil {
-		return nil, err
-	}
-
-	return sessionToken, nil
-}
-
 func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if id == "" {
 		return nil, SessionToken_error_no_userid

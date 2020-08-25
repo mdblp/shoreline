@@ -33,9 +33,6 @@ type ResponsableMockStoreClient struct {
 	FindUsersWithIdsResponses []FindUsersWithIdsResponse
 	FindUserResponses         []FindUserResponse
 	RemoveUserResponses       []error
-	AddTokenResponses         []error
-	FindTokenByIDResponses    []FindTokenByIDResponse
-	RemoveTokenByIDResponses  []error
 }
 
 func NewResponsableMockStoreClient() *ResponsableMockStoreClient {
@@ -49,10 +46,7 @@ func (r *ResponsableMockStoreClient) HasResponses() bool {
 		len(r.FindUsersByRoleResponses) > 0 ||
 		len(r.FindUsersWithIdsResponses) > 0 ||
 		len(r.FindUserResponses) > 0 ||
-		len(r.RemoveUserResponses) > 0 ||
-		len(r.AddTokenResponses) > 0 ||
-		len(r.FindTokenByIDResponses) > 0 ||
-		len(r.RemoveTokenByIDResponses) > 0
+		len(r.RemoveUserResponses) > 0
 }
 
 func (r *ResponsableMockStoreClient) Reset() {
@@ -63,12 +57,10 @@ func (r *ResponsableMockStoreClient) Reset() {
 	r.FindUsersWithIdsResponses = nil
 	r.FindUserResponses = nil
 	r.RemoveUserResponses = nil
-	r.AddTokenResponses = nil
-	r.FindTokenByIDResponses = nil
-	r.RemoveTokenByIDResponses = nil
 }
 
-func (r *ResponsableMockStoreClient) Close() {
+func (r *ResponsableMockStoreClient) Close() error {
+	return nil
 }
 
 func (r *ResponsableMockStoreClient) Ping() (err error) {
@@ -129,29 +121,4 @@ func (r *ResponsableMockStoreClient) RemoveUser(user *User) (err error) {
 		return err
 	}
 	panic("RemoveUserResponses unavailable")
-}
-
-func (r *ResponsableMockStoreClient) AddToken(token *SessionToken) (err error) {
-	if len(r.AddTokenResponses) > 0 {
-		err, r.AddTokenResponses = r.AddTokenResponses[0], r.AddTokenResponses[1:]
-		return err
-	}
-	panic("AddTokenResponses unavailable")
-}
-
-func (r *ResponsableMockStoreClient) FindTokenByID(id string) (*SessionToken, error) {
-	if len(r.FindTokenByIDResponses) > 0 {
-		var response FindTokenByIDResponse
-		response, r.FindTokenByIDResponses = r.FindTokenByIDResponses[0], r.FindTokenByIDResponses[1:]
-		return response.SessionToken, response.Error
-	}
-	panic("FindTokenByIDResponses unavailable")
-}
-
-func (r *ResponsableMockStoreClient) RemoveTokenByID(id string) (err error) {
-	if len(r.RemoveTokenByIDResponses) > 0 {
-		err, r.RemoveTokenByIDResponses = r.RemoveTokenByIDResponses[0], r.RemoveTokenByIDResponses[1:]
-		return err
-	}
-	panic("RemoveTokenByIDResponses unavailable")
 }

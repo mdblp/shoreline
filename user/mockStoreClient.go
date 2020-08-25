@@ -1,6 +1,8 @@
 package user
 
-import "errors"
+import (
+	"errors"
+)
 
 type MockStoreClient struct {
 	salt            string
@@ -12,7 +14,9 @@ func NewMockStoreClient(salt string, returnDifferent, doBad bool) *MockStoreClie
 	return &MockStoreClient{salt: salt, doBad: doBad, returnDifferent: returnDifferent}
 }
 
-func (d MockStoreClient) Close() {}
+func (d MockStoreClient) Close() error {
+	return nil
+}
 
 func (d MockStoreClient) Ping() error {
 	if d.doBad {
@@ -119,28 +123,6 @@ func (d MockStoreClient) FindUser(user *User) (found *User, err error) {
 func (d MockStoreClient) RemoveUser(user *User) error {
 	if d.doBad {
 		return errors.New("RemoveUser failure")
-	}
-	return nil
-}
-
-func (d MockStoreClient) AddToken(token *SessionToken) error {
-	if d.doBad {
-		return errors.New("AddToken failure")
-	}
-	return nil
-}
-
-func (d MockStoreClient) FindTokenByID(id string) (*SessionToken, error) {
-	if d.doBad {
-		return nil, errors.New("FindTokenByID failure")
-	}
-	//`find` a pretend one we just made
-	return nil, nil
-}
-
-func (d MockStoreClient) RemoveTokenByID(id string) error {
-	if d.doBad {
-		return errors.New("RemoveTokenByID failure")
 	}
 	return nil
 }
