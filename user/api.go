@@ -17,10 +17,10 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/tidepool-org/go-common/clients"
-	"github.com/tidepool-org/go-common/clients/status"
-	"github.com/tidepool-org/shoreline/user/mailchimp"
-	"github.com/tidepool-org/shoreline/user/marketo"
+	"github.com/mdblp/go-common/clients"
+	"github.com/mdblp/go-common/clients/status"
+	"github.com/mdblp/shoreline/user/mailchimp"
+	"github.com/mdblp/shoreline/user/marketo"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -237,7 +237,6 @@ const (
 )
 
 func InitApi(cfg ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger, manager marketo.Manager) *Api {
-
 	mailchimpManager, err := mailchimp.NewManager(logger, &http.Client{Timeout: 15 * time.Second}, &cfg.Mailchimp)
 	if err != nil {
 		logger.Println("WARNING: Mailchimp Manager not configured;", err)
@@ -497,7 +496,6 @@ func (a *Api) CreateCustodialUser(res http.ResponseWriter, req *http.Request, va
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
 // @Router /user/{userid} [put]
 func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-	a.logger.Printf("UpdateUser %v", req)
 	sessionToken := req.Header.Get(TP_SESSION_TOKEN)
 	if tokenData, err := a.authenticateSessionToken(sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
@@ -670,7 +668,6 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Failure 401 {string} string ""
 // @Router /user/{userid} [delete]
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-
 	td, err := a.authenticateSessionToken(req.Header.Get(TP_SESSION_TOKEN))
 
 	if err != nil {
@@ -696,7 +693,6 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 
 		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); err == nil {
 			if err = a.Store.RemoveUser(toDelete); err == nil {
-
 				a.logAudit(req, td, "DeleteUser")
 				// all good
 				res.WriteHeader(http.StatusAccepted)

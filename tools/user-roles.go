@@ -11,7 +11,7 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"github.com/tidepool-org/go-common/clients/shoreline"
+	"github.com/mdblp/go-common/clients/shoreline"
 )
 
 const (

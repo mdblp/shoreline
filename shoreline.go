@@ -31,14 +31,15 @@ import (
 
 	"github.com/gorilla/mux"
 
+	common "github.com/mdblp/go-common"
+	"github.com/mdblp/go-common/clients"
+	"github.com/mdblp/go-common/clients/disc"
+	"github.com/mdblp/go-common/clients/mongo"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	common "github.com/tidepool-org/go-common"
-	"github.com/tidepool-org/go-common/clients"
-	"github.com/tidepool-org/go-common/clients/disc"
-	"github.com/tidepool-org/go-common/clients/mongo"
-	"github.com/tidepool-org/shoreline/user"
-	"github.com/tidepool-org/shoreline/user/marketo"
+
+	"github.com/mdblp/shoreline/user"
+	"github.com/mdblp/shoreline/user/marketo"
 )
 
 var (

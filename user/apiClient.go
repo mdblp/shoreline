@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	commonUserApi "github.com/tidepool-org/go-common/clients/shoreline"
-	"github.com/tidepool-org/go-common/clients/status"
+	commonUserApi "github.com/mdblp/go-common/clients/shoreline"
+	"github.com/mdblp/go-common/clients/status"
 )
 
 func extractUserData(data string) (*commonUserApi.UserData, error) {

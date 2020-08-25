@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/tidepool-org/go-common/clients"
-	"github.com/tidepool-org/go-common/clients/version"
 
-	"github.com/tidepool-org/shoreline/user/marketo"
+	"github.com/mdblp/go-common/clients"
+	"github.com/mdblp/go-common/clients/version"
+	"github.com/mdblp/shoreline/user/marketo"
 )
 
 const (

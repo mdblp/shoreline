@@ -1,6 +1,6 @@
 package user
 
-import "github.com/tidepool-org/go-common/clients"
+import "github.com/mdblp/go-common/clients"
 
 type PermissionsResponse struct {
 	Permissions clients.Permissions
@@ -50,6 +50,10 @@ func (c *ResponsableMockGatekeeper) UsersInGroup(groupID string) (clients.UsersP
 		return response.UsersPermissions, response.Error
 	}
 	panic("UsersInGroupResponses unavailable")
+}
+
+func (c *ResponsableMockGatekeeper) GroupsForUser(userID string) (clients.UsersPermissions, error) {
+	panic("GroupsForUser is not implemented")
 }
 
 func (c *ResponsableMockGatekeeper) SetPermissions(userID, groupID string, permissions clients.Permissions) (clients.Permissions, error) {
