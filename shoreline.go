@@ -36,7 +36,6 @@ import (
 	common "github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
-	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
 	"github.com/tidepool-org/shoreline/user"
 	"github.com/tidepool-org/shoreline/user/marketo"
@@ -158,22 +157,6 @@ func main() {
 	config.Mongo.FromEnv()
 
 	/*
-	 * Hakken setup
-	 */
-	hakkenClient := hakken.NewHakkenBuilder().
-		WithConfig(&config.HakkenConfig).
-		Build()
-
-	if !config.HakkenConfig.SkipHakken {
-		if err := hakkenClient.Start(); err != nil {
-			logger.Fatal(err)
-		}
-		defer hakkenClient.Close()
-	} else {
-		logger.Print("skipping hakken service")
-	}
-
-	/*
 	 * Clients
 	 */
 
@@ -210,7 +193,7 @@ func main() {
 
 	logger.Print("creating gatekeeper client")
 	permsClient := clients.NewGatekeeperClientBuilder().
-		WithHostGetter(config.GatekeeperConfig.ToHostGetter(hakkenClient)).
+		WithHost(os.Getenv("GATEKEEPER_SERVICE")).
 		WithHttpClient(httpClient).
 		WithTokenProvider(userClient).
 		Build()
@@ -239,8 +222,6 @@ func main() {
 	if err := start(); err != nil {
 		logger.Fatal(err)
 	}
-
-	hakkenClient.Publish(&config.Service)
 
 	logger.Print("listenting for signals")
 
