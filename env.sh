@@ -1,8 +1,7 @@
-export TIDEPOOL_SHORELINE_ENV='{
-    "hakken": { "host": "localhost:8000" },
-    "gatekeeper": { "serviceSpec": { "type": "static", "hosts": ["http://localhost:9123"] } }
-}'
+export GATEKEEPER_SERVICE="http://localhost:9123"
 
+# MONGODB_HOST="mongodb://localhost/"
+# MONGODB_HOST="mongodb://personal:password@localhost:27017/user?authSource=admin&ssl=false"
 export TIDEPOOL_SHORELINE_SERVICE='{
     "service": {
         "service": "user-api-local",
@@ -12,10 +11,10 @@ export TIDEPOOL_SHORELINE_SERVICE='{
         "certFile": "config/cert.pem"
     },
     "mongo": {
-        "connectionString": "mongodb://localhost/user"
+        "connectionString": "mongodb://localhost/"
     },
     "user": {
-        "secrets": [{\"secret\": \"default\", \"pass\": \"xxxxxxxxx\"}, {\"secret\": \"product_website\", \"pass\": \"xxxxxxxxx\"}],
+        "secrets": [{"secret": "default", "pass": "xxxxxxxxx"}, {"secret": "product_website", "pass": "xxxxxxxxx"}],
         "apiSecret": "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
         "longTermKey": "abcdefghijklmnopqrstuvwxyz",
         "longTermDaysDuration": 30,

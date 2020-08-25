@@ -1,7 +1,8 @@
 package user
 
+// Storage interface for the database
 type Storage interface {
-	Close()
+	Close() error
 	Ping() error
 	UpsertUser(user *User) error
 	FindUser(user *User) (*User, error)
@@ -9,7 +10,4 @@ type Storage interface {
 	FindUsersByRole(role string) ([]*User, error)
 	FindUsersWithIds(role []string) ([]*User, error)
 	RemoveUser(user *User) error
-	AddToken(token *SessionToken) error
-	FindTokenByID(id string) (*SessionToken, error)
-	RemoveTokenByID(id string) error
 }

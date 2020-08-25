@@ -247,6 +247,7 @@ func ParseNewUserDetails(reader io.Reader) (*NewUserDetails, error) {
 	}
 }
 
+// NewUser create a new user
 func NewUser(details *NewUserDetails, salt string) (user *User, err error) {
 	if details == nil {
 		return nil, errors.New("New user details is nil")
