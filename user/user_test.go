@@ -1286,7 +1286,7 @@ func Test_User_DeepClone(t *testing.T) {
 		EmailVerified: true,
 		PwHash:        "this-is-the-password-hash",
 		Hash:          "this-is-the-hash",
-		Private:       map[string]*IdHashPair{"a": &IdHashPair{"1", "2"}, "b": &IdHashPair{"3", "4"}},
+		Private:       map[string]*IdHashPair{"a": {"1", "2"}, "b": {"3", "4"}},
 	}
 	clonedUser := user.DeepClone()
 	if !reflect.DeepEqual(user, clonedUser) {

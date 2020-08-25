@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	mongoCommon "github.com/mdblp/go-common/clients/mongo"
@@ -67,19 +68,25 @@ func (s *MongoStoreClient) UpsertUser(user *User) error {
 		return fmt.Errorf("db connection error")
 	}
 
-	s.ensureCollection()
+	if user.Roles != nil {
+		sort.Strings(user.Roles)
+	}
 
-	s.logger.Printf("Mongo: UpsertUser: %v", user)
+	s.logger.Printf("UpsertUser: %v", user)
+
+	s.ensureCollection()
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
 	singleResult := s.collection.FindOne(ctx, bson.M{"userid": user.Id})
 	err = singleResult.Err()
 	if err != nil && err == mongo.ErrNoDocuments {
-		_, err = s.collection.InsertOne(ctx, user)
+		s.logger.Printf("User id %s not found, creating a new one", user.Id)
+		_, err = s.collection.InsertOne(ctx, *user)
 
 	} else {
-		updateResult, err := s.collection.UpdateOne(ctx, bson.M{"userid": user.Id}, user)
+		var updateResult *mongo.UpdateResult
+		updateResult, err = s.collection.UpdateOne(ctx, bson.M{"userid": user.Id}, bson.M{"$set": user})
 		if err == nil && updateResult.MatchedCount != 1 {
 			err = fmt.Errorf("No document found")
 		}
@@ -94,11 +101,12 @@ func (s *MongoStoreClient) FindUser(user *User) (*User, error) {
 		return nil, fmt.Errorf("db connection error")
 	}
 
+	s.logger.Printf("FindUser: %s", user.Id)
+
 	s.ensureCollection()
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
-	s.logger.Printf("FindUser %s", user.Id)
 	result := s.collection.FindOne(ctx, bson.M{"userid": user.Id})
 	err := result.Err()
 	if err != nil && err == mongo.ErrNoDocuments {
@@ -110,7 +118,6 @@ func (s *MongoStoreClient) FindUser(user *User) (*User, error) {
 	}
 	userFound := &User{}
 	result.Decode(userFound)
-	s.logger.Printf("FindUser %s: %v", user.Id, userFound)
 	return userFound, nil
 }
 
@@ -137,8 +144,9 @@ func (s *MongoStoreClient) FindUsers(user *User) ([]*User, error) {
 		fieldsToMatch = append(fieldsToMatch, bson.M{"emails": bson.M{"$in": user.Emails}})
 	}
 
-	s.ensureCollection()
+	s.logger.Printf("FindUsers: %v", fieldsToMatch)
 
+	s.ensureCollection()
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
@@ -151,6 +159,8 @@ func (s *MongoStoreClient) FindUsersByRole(role string) ([]*User, error) {
 	if continuousPing && !s.client.PingOK {
 		return nil, fmt.Errorf("db connection error")
 	}
+
+	s.logger.Printf("FindUsersByRole: %s", role)
 
 	s.ensureCollection()
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
@@ -166,11 +176,13 @@ func (s *MongoStoreClient) FindUsersWithIds(ids []string) ([]*User, error) {
 		return nil, fmt.Errorf("db connection error")
 	}
 
+	s.logger.Printf("FindUsersWithIds: %v", ids)
+
 	s.ensureCollection()
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
-	cursor, err := s.collection.Find(ctx, bson.M{"ids": ids})
+	cursor, err := s.collection.Find(ctx, bson.M{"userid": bson.M{"$in": ids}})
 	return s.findUsersResults(ctx, cursor, err)
 }
 
@@ -180,22 +192,14 @@ func (s *MongoStoreClient) findUsersResults(ctx context.Context, cursor *mongo.C
 		return nil, err
 	}
 
-	var users []User
+	var users []*User
 	err = cursor.All(ctx, &users)
 
 	if err != nil {
 		return nil, err
 	}
 
-	s.logger.Printf("findUsersResults %d => %v", len(users), users)
-
-	usersPtr := make([]*User, len(users))
-
-	for index, user := range users {
-		usersPtr[index] = &user
-	}
-
-	return usersPtr, nil
+	return users, nil
 }
 
 // RemoveUser from the database
@@ -204,10 +208,9 @@ func (s *MongoStoreClient) RemoveUser(user *User) error {
 		return fmt.Errorf("db connection error")
 	}
 
-	s.logger.Printf("Mongo: RemoveUser: %v", user)
+	s.logger.Printf("RemoveUser: %s", user.Id)
 
 	s.ensureCollection()
-
 	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
 	defer cancel()
 
@@ -217,7 +220,7 @@ func (s *MongoStoreClient) RemoveUser(user *User) error {
 	}
 
 	if delResult.DeletedCount != 1 {
-		return fmt.Errorf("Nothing deleted")
+		return fmt.Errorf("RemoveUser: %s Not found, nothing deleted", user.Id)
 	}
 
 	return nil

@@ -1,53 +1,78 @@
 package user
 
 import (
+	"context"
+	"log"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/globalsign/mgo"
+	"time"
 
 	"github.com/mdblp/go-common/clients/mongo"
 )
 
-func mgoTestSetup() (*MongoStoreClient, error) {
-	mc := NewMongoStoreClient(&mongo.Config{ConnectionString: "mongodb://127.0.0.1/user_test"})
-
-	/*
-	 * INIT THE TEST - we use a clean copy of the collection before we start
-	 */
-	cpy := mc.session.Copy()
-	defer cpy.Close()
-
-	//just drop and don't worry about any errors
-	mgoUsersCollection(cpy).DropCollection()
-
-	if err := mgoUsersCollection(cpy).Create(&mgo.CollectionInfo{}); err != nil {
+func mongoTestSetup() (*MongoStoreClient, error) {
+	logger = log.New(os.Stdout, "mongo-store-tests ", log.LstdFlags|log.LUTC|log.Lshortfile)
+	mc, err := NewMongoStoreClient(&mongo.Config{ConnectionString: "mongodb://localhost/"}, logger)
+	if err != nil {
 		return nil, err
 	}
-	return mc, nil
+
+	time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 3; i++ {
+		// Wait db response
+		err = mc.Ping()
+		if err == nil {
+			break
+		}
+		time.Sleep(contextTimeout)
+	}
+
+	if err != nil {
+		defer mc.Close()
+		return nil, err
+	}
+
+	if mc.collection == nil {
+		mc.collection = (*mc.client).GetCollection(usersDatabase, "users-tests")
+	}
+
+	// Be sure to have a clean collection before the tests
+	logger.Printf("Dropping test collection")
+
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	defer cancel()
+
+	err = mc.collection.Drop(ctx)
+	if err != nil {
+		defer mc.Close()
+		return nil, err
+	}
+
+	return &mc, nil
 }
 
 func TestMongoStoreUserOperations(t *testing.T) {
-
 	var (
-		usernameOriginal     = "test@foo.bar"
-		usernameOther        = "other@foo.bar"
-		password             = "myT35ter"
-		original_user_detail = &NewUserDetails{Username: &usernameOriginal, Emails: []string{usernameOriginal}, Password: &password}
-		other_user_detail    = &NewUserDetails{Username: &usernameOther, Emails: original_user_detail.Emails, Password: &password}
+		usernameOriginal   = "test@foo.bar"
+		usernameOther      = "other@foo.bar"
+		password           = "myT35ter"
+		originalUserDetail = &NewUserDetails{Username: &usernameOriginal, Emails: []string{usernameOriginal}, Password: &password}
+		otherUserDetail    = &NewUserDetails{Username: &usernameOther, Emails: originalUserDetail.Emails, Password: &password}
 	)
 
-	const tests_fake_salt = "some fake salt for the tests"
+	const testsFakeSalt = "some fake salt for the tests"
 
-	mc, err := mgoTestSetup()
+	mc, err := mongoTestSetup()
 	if err != nil {
 		t.Fatalf("we initialise the test store %s", err.Error())
 	}
+	defer mc.Close()
 
 	/*
 	 * THE TESTS
 	 */
-	user, err := NewUser(original_user_detail, tests_fake_salt)
+	user, err := NewUser(originalUserDetail, testsFakeSalt)
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -65,7 +90,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	if found, err := mc.FindUsers(toFindByOriginalName); err != nil {
 		t.Fatalf("we could not find the the user by name: err[%v]", err)
 	} else {
-		if len(found) > 0 && found[0].Username != toFindByOriginalName.Username && found[0].Username != *original_user_detail.Username {
+		if len(found) > 0 && found[0].Username != toFindByOriginalName.Username && found[0].Username != *originalUserDetail.Username {
 			t.Fatalf("the user we found doesn't match what we asked for %v", found)
 		}
 	}
@@ -98,7 +123,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	user.Username = "test user updated"
 
 	if err := mc.UpsertUser(user); err != nil {
-		t.Fatalf("we could not update the user %v", err)
+		t.Fatalf("we could not update the user: %v", err)
 	}
 
 	//By Username
@@ -136,18 +161,18 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	}
 
 	//By Id
-	toFindById := &User{Id: user.Id}
+	toFindByID := &User{Id: user.Id}
 
-	if found, err := mc.FindUser(toFindById); err != nil {
+	if found, err := mc.FindUser(toFindByID); err != nil {
 		t.Fatalf("we could not find the the user by id err[%v]", err)
 	} else {
-		if found.Id != toFindById.Id {
+		if found.Id != toFindByID.Id {
 			t.Fatalf("the user we found doesn't match what we asked for %v", found)
 		}
 	}
 
 	//Find many By Email - user and userTwo have the same emails addresses
-	userTwo, err := NewUser(other_user_detail, tests_fake_salt)
+	userTwo, err := NewUser(otherUserDetail, testsFakeSalt)
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -168,28 +193,26 @@ func TestMongoStoreUserOperations(t *testing.T) {
 }
 
 func TestMongoStore_FindUsersByRole(t *testing.T) {
-
 	var (
-		tests_fake_salt = "some fake salt for the tests"
-		user_one_name   = "test@foo.bar"
-		user_two_name   = "test_two@foo.bar"
-		user_pw         = "my0th3rT35t"
-		user_one_detail = &NewUserDetails{Username: &user_one_name, Emails: []string{user_one_name}, Password: &user_pw}
-		user_two_detail = &NewUserDetails{Username: &user_two_name, Emails: []string{user_two_name}, Password: &user_pw}
+		testsFakeSalt = "some fake salt for the tests"
+		userOneName   = "test@foo.bar"
+		userTwoName   = "test_two@foo.bar"
+		userPasswd    = "my0th3rT35t"
+		userOneDetail = &NewUserDetails{Username: &userOneName, Emails: []string{userOneName}, Password: &userPasswd}
+		userTwoDetail = &NewUserDetails{Username: &userTwoName, Emails: []string{userTwoName}, Password: &userPasswd}
 	)
 
-	mc, err := mgoTestSetup()
+	mc, err := mongoTestSetup()
 	if err != nil {
 		t.Fatalf("we initialise the test store %s", err.Error())
 	}
+	defer mc.Close()
 
-	/*
-	 * THE TESTS
-	 */
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
+	// THE TESTS
+	userOne, _ := NewUser(userOneDetail, testsFakeSalt)
 	userOne.Roles = append(userOne.Roles, "clinic")
 
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	userTwo, _ := NewUser(userTwoDetail, testsFakeSalt)
 
 	if err := mc.UpsertUser(userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)
@@ -203,30 +226,27 @@ func TestMongoStore_FindUsersByRole(t *testing.T) {
 	} else if len(found) != 1 || found[0].Roles[0] != "clinic" {
 		t.Fatalf("should only find clinic users but found %v", found)
 	}
-
 }
 
 func TestMongoStore_FindUsersById(t *testing.T) {
-
 	var (
-		tests_fake_salt = "some fake salt for the tests"
-		user_one_name   = "test@foo.bar"
-		user_two_name   = "test_two@foo.bar"
-		user_pw         = "my0th3rT35t"
-		user_one_detail = &NewUserDetails{Username: &user_one_name, Emails: []string{user_one_name}, Password: &user_pw}
-		user_two_detail = &NewUserDetails{Username: &user_two_name, Emails: []string{user_two_name}, Password: &user_pw}
+		testsFakeSalt = "some fake salt for the tests"
+		userOneName   = "test@foo.bar"
+		userTwoName   = "test_two@foo.bar"
+		userPasswd    = "my0th3rT35t"
+		userOneDetail = &NewUserDetails{Username: &userOneName, Emails: []string{userOneName}, Password: &userPasswd}
+		userTwoDetail = &NewUserDetails{Username: &userTwoName, Emails: []string{userTwoName}, Password: &userPasswd}
 	)
 
-	mc, err := mgoTestSetup()
+	mc, err := mongoTestSetup()
 	if err != nil {
 		t.Fatalf("we could not initialise the test store %s", err.Error())
 	}
+	defer mc.Close()
 
-	/*
-	 * THE TESTS
-	 */
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	// THE TESTS
+	userOne, _ := NewUser(userOneDetail, testsFakeSalt)
+	userTwo, _ := NewUser(userTwoDetail, testsFakeSalt)
 
 	if err := mc.UpsertUser(userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)
