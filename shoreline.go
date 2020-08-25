@@ -61,8 +61,9 @@ type (
 
 func main() {
 	var config Config
-	logger := log.New(os.Stdout, user.USER_API_PREFIX, log.LstdFlags|log.Lshortfile)
-	auditLogger := log.New(os.Stdout, user.USER_API_PREFIX, log.LstdFlags)
+	logger := log.New(os.Stdout, user.USER_API_PREFIX, log.LstdFlags|log.LUTC|log.Lshortfile)
+	auditLogger := log.New(os.Stdout, user.USER_API_PREFIX, log.LstdFlags|log.LUTC|log.Lshortfile)
+	mongoLogger := log.New(os.Stdout, "mongodb ", log.LstdFlags|log.LUTC|log.Lshortfile)
 	// Init random number generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -72,8 +73,8 @@ func main() {
 	config.User.MaxConcurrentLogin = 100
 	config.User.BlockParallelLogin = true
 
-	if err := common.LoadEnvironmentConfig([]string{"TIDEPOOL_SHORELINE_ENV", "TIDEPOOL_SHORELINE_SERVICE"}, &config); err != nil {
-		logger.Panic("Problem loading Shoreline config", err)
+	if err := common.LoadEnvironmentConfig([]string{"TIDEPOOL_SHORELINE_SERVICE"}, &config); err != nil {
+		logger.Fatalf("Problem loading Shoreline config: %v", err)
 	}
 
 	// server secret may be passed via a separate env variable to accomodate easy secrets injection via Kubernetes
@@ -157,10 +158,14 @@ func main() {
 
 	config.Mongo.FromEnv()
 
-	/*
-	 * Clients
-	 */
+	// Database
+	clientStore, err := user.NewMongoStoreClient(&config.Mongo, mongoLogger)
+	if err != nil {
+		logger.Fatalf("Failed to init mongo: %v", err)
+	}
+	defer clientStore.Close()
 
+	// Clients
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -184,15 +189,14 @@ func main() {
 			logger.Println("WARNING: Marketo Manager not configured;", err)
 		}
 	}
-
-	clientStore := user.NewMongoStoreClient(&config.Mongo)
-	userapi := user.InitApi(config.User, logger, clientStore, auditLogger, marketoManager)
+	userapi := user.InitApi(config.User, logger, &clientStore, auditLogger, marketoManager)
 	logger.Print("installing handlers")
 	userapi.SetHandlers("", rtr)
 
 	userClient := user.NewUserClient(userapi)
 
 	logger.Print("creating gatekeeper client")
+
 	permsClient := clients.NewGatekeeperClientBuilder().
 		WithHost(os.Getenv("GATEKEEPER_SERVICE")).
 		WithHttpClient(httpClient).
@@ -209,7 +213,7 @@ func main() {
 	server := common.NewServer(&http.Server{
 		Addr:    config.Service.GetPort(),
 		Handler: rtr,
-	})
+	}, logger)
 
 	var start func() error
 	if config.Service.Scheme == "https" {
@@ -231,8 +235,6 @@ func main() {
 	go func() {
 		for {
 			sig := <-signals
-			logger.Printf("Got signal [%s]", sig)
-
 			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
 				server.Close()
 				done <- true
@@ -241,5 +243,4 @@ func main() {
 	}()
 
 	<-done
-
 }
