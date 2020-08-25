@@ -1,21 +1,21 @@
-sudo: false
-
 language: go
-
+os: linux
 dist: bionic
-
-go:
-  - 1.12.7
-
-go_import_path: github.com/mdblp/shoreline
 
 env:
   # Using Go module (go 1.12 need this variable to be set to enable modules)
   # The variable should default to "on", in Go 1.14 release
-  global: 
-    - GO111MODULE=on
+  global:
     - BUILD_OPENAPI_DOC=true
     - BUILD_SOUP=true
+
+jobs:
+  include:
+    - go: 1.12.17
+      env: GO111MODULE=on
+    - go: 1.14.x
+  allow_failures:
+    - go: 1.14.x
 
 deploy:
   # Control deployment by setting a value for `on`. Setting the `branch`
@@ -31,11 +31,11 @@ deploy:
     # Name of the S3 bucket to which your site should be uploaded.
     bucket: $AWS_BUCKET
     # Prevent Travis from deleting your built site so it can be uploaded.
-    skip_cleanup: true
+    cleanup: false
     # Path of the source directory containing your built site.
     local_dir: deploy
     # Path to a directory containing your built site.
-    upload-dir: deploy
+    upload_dir: deploy
     # Set the Cache-Control header.
     cache_control: "max-age=21600"
     # Deploy SOUP list
@@ -47,9 +47,9 @@ deploy:
     secret_access_key: $AWS_SECRET_ACCESS_KEY
     region: $AWS_DEFAULT_REGION
     bucket: com.diabeloop.yourloops.doc
-    skip_cleanup: true
+    cleanup: false
     local_dir: ./docs/soup
-    upload-dir: soup
+    upload_dir: soup
     cache_control: "max-age=21600"
     # Deploy doc
   - provider: s3
@@ -60,14 +60,19 @@ deploy:
     secret_access_key: $AWS_SECRET_ACCESS_KEY
     region: $AWS_DEFAULT_REGION
     bucket: com.diabeloop.yourloops.doc
-    skip_cleanup: true
+    cleanup: false
     local_dir: docs/openapi
-    upload-dir: openapi/shoreline
+    upload_dir: openapi/shoreline
     cache_control: "max-age=21600"
 
 services:
   - docker
   - mongodb
+
+before_script:
+  # `go get` set directory readonly, which prevent swaggo
+  # to generate the documentation
+  - chmod -Rv u+w $GOPATH/pkg/mod/github.com/mdblp/
 
 script:
   - ./build.sh

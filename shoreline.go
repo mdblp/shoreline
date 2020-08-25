@@ -30,14 +30,13 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	common "github.com/mdblp/go-common"
 	"github.com/mdblp/go-common/clients"
 	"github.com/mdblp/go-common/clients/disc"
 	"github.com/mdblp/go-common/clients/mongo"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-
 	"github.com/mdblp/shoreline/user"
 	"github.com/mdblp/shoreline/user/marketo"
 )

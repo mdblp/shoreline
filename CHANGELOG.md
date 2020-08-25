@@ -2,6 +2,15 @@
 
 Shoreline is the module that manages logins and user accounts.
 
+## 1.1.0 - 2020-08-25
+- PT-1439 Shoreline should be able to start without MongoDb
+  * Update to the official mongodb driver
+  * Bump go to 1.12.17
+  * Update program package name
+  * Remove Hakken too
+  * Remove OAuth
+  * Remove token store
+
 ## 1.0.1 - 2020-07-29
 - Fix Soup document name: remove dblp from tag
 

@@ -2,7 +2,7 @@ deploy/
 dist/
 .vscode/launch.json
 vendor/
-
+shoreline
 *.exe
 artifact_go.sh
 docs/

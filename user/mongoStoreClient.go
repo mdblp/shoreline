@@ -7,10 +7,11 @@ import (
 	"sort"
 	"time"
 
-	mongoCommon "github.com/mdblp/go-common/clients/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	mongoCommon "github.com/mdblp/go-common/clients/mongo"
 )
 
 const (

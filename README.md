@@ -1,7 +1,7 @@
 shoreline
 =========
 
-[![Build Status](https://travis-ci.com/tidepool-org/shoreline.png)](https://travis-ci.com/tidepool-org/shoreline)
+[![Build Status](https://travis-ci.org/mdblp/shoreline.svg?branch=dblp)](https://travis-ci.org/github/mdblp/shoreline)
 
 Shoreline is the entrance to the ocean; in our case it manages logins and user accounts
 

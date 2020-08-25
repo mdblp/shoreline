@@ -16,15 +16,15 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-
-	"github.com/mdblp/go-common/clients"
-	"github.com/mdblp/go-common/clients/status"
-	"github.com/mdblp/shoreline/user/mailchimp"
-	"github.com/mdblp/shoreline/user/marketo"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/mdblp/go-common/clients"
+	"github.com/mdblp/go-common/clients/status"
+
+	"github.com/mdblp/shoreline/user/mailchimp"
+	"github.com/mdblp/shoreline/user/marketo"
 )
 
 var (

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"runtime/debug"
 
 	"testing"
 	"time"
@@ -724,9 +723,9 @@ const (
 )
 
 func checkParam(t *testing.T, params url.Values, key, expected string) {
-	log.Printf("PARAMS KEY %v", params[key][0])
-	log.Printf("EXPECTED %v", expected)
-	debug.PrintStack()
+	// log.Printf("PARAMS KEY %v", params[key][0])
+	// log.Printf("EXPECTED %v", expected)
+	// debug.PrintStack()
 	if params[key][0] != expected {
 		t.Errorf("expected '%s', got '%s'", expected, params[key][0])
 	}
