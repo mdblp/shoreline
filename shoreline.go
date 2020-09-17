@@ -201,8 +201,15 @@ func main() {
 		}
 	}
 
-	clientStore := user.NewMongoStoreClient(&config.Mongo)
-	userapi := user.InitApi(config.User, logger, clientStore, auditLogger, marketoManager)
+	// clientStore := user.NewMongoStoreClient(&config.Mongo)
+	storage, err := user.NewStore(&config.Mongo, logger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	defer storage.Close()
+	storage.Start()
+
+	userapi := user.InitApi(config.User, logger, storage, auditLogger, marketoManager)
 	logger.Print("installing handlers")
 	userapi.SetHandlers("", rtr)
 
@@ -252,6 +259,7 @@ func main() {
 			logger.Printf("Got signal [%s]", sig)
 
 			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
+				storage.Close()
 				server.Close()
 				done <- true
 			}
