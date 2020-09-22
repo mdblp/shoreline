@@ -12,6 +12,7 @@ import (
 )
 
 func mgoTestSetup() (*Client, error) {
+	// testing against mongodb://127.0.0.1/user_test
 	var testingConfig = &mongo.Config{
 		Database:               "user_test",
 		Timeout:                2 * time.Second,
@@ -20,7 +21,6 @@ func mgoTestSetup() (*Client, error) {
 	}
 	var logger = log.New(os.Stdout, "mongo-test ", log.LstdFlags|log.LUTC|log.Lshortfile)
 
-	// mc := NewMongoStoreClient(&mongo.Config{ConnectionString: "mongodb://127.0.0.1/user_test"})
 	mc, _ := NewStore(testingConfig, logger)
 	mc.Start()
 	mc.WaitUntilStarted()
@@ -28,9 +28,6 @@ func mgoTestSetup() (*Client, error) {
 	//just drop and don't worry about any errors
 	mgoUsersCollection(mc).Drop(context.TODO())
 
-	// if err := mgoUsersCollection(cpy).Create(&mgo.CollectionInfo{}); err != nil {
-	// 	return nil, err
-	// }
 	return mc, nil
 }
 

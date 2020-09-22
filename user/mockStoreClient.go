@@ -16,7 +16,7 @@ func NewMockStoreClient(salt string, returnDifferent, doBad bool) *MockStoreClie
 	return &MockStoreClient{salt: salt, doBad: doBad, returnDifferent: returnDifferent}
 }
 
-func (c *MockStoreClient) Close() error {
+func (d *MockStoreClient) Close() error {
 	return nil
 }
 func (d MockStoreClient) Ping() error {
