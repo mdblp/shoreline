@@ -18,23 +18,6 @@ const (
 	TOKENS_COLLECTION = "tokens"
 )
 
-// type MongoStoreClient struct {
-// 	session *mgo.Session
-// }
-
-//We implement the interface from user.Storage
-// func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
-
-// 	mongoSession, err := mongo.Connect(config)
-// 	if err != nil {
-// 		log.Fatalf("Cannot connect to mongo: %v, %v", config, err)
-// 	}
-
-// 	return &MongoStoreClient{
-// 		session: mongoSession,
-// 	}
-// }
-
 // Client struct
 type Client struct {
 	*goComMgo.StoreClient
