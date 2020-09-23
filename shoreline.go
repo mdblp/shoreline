@@ -201,7 +201,6 @@ func main() {
 		}
 	}
 
-	// clientStore := user.NewMongoStoreClient(&config.Mongo)
 	storage, err := user.NewStore(&config.Mongo, logger)
 	if err != nil {
 		logger.Fatal(err)
