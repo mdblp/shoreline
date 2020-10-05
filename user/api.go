@@ -422,7 +422,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 
 		tokenData := TokenData{DurationSecs: extractTokenDuration(req), UserId: newUser.Id, IsServer: false}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(&tokenData, tokenConfig, a.Store); err != nil {
+		if sessionToken, err := CreateSessionToken(&tokenData, tokenConfig); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
 		} else {
 			a.logAudit(req, &tokenData, "CreateUser isClinic{%t}", newUser.IsClinic())
@@ -670,7 +670,6 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Failure 401 {string} string ""
 // @Router /user/{userid} [delete]
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-
 	td, err := a.authenticateSessionToken(req.Header.Get(TP_SESSION_TOKEN))
 
 	if err != nil {
@@ -690,7 +689,6 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 	pw := getGivenDetail(req)["password"]
 
 	if id != "" && pw != "" {
-
 		var err error
 		toDelete := &User{Id: id}
 
@@ -698,19 +696,16 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 			if err = a.Store.RemoveUser(toDelete); err == nil {
 
 				a.logAudit(req, td, "DeleteUser")
-				//cleanup if any
-				if td.IsServer == false {
-					a.Store.RemoveTokenByID(req.Header.Get(TP_SESSION_TOKEN))
-				}
-				//all good
+				// all good
 				res.WriteHeader(http.StatusAccepted)
-				return
+			} else {
+				a.logger.Println(http.StatusInternalServerError, err.Error())
+				res.WriteHeader(http.StatusInternalServerError)
 			}
+			return
 		}
-		a.logger.Println(http.StatusInternalServerError, err.Error())
-		res.WriteHeader(http.StatusInternalServerError)
-		return
 	}
+
 	a.logger.Println(http.StatusForbidden, STATUS_MISSING_ID_PW)
 	sendModelAsResWithStatus(res, status.NewStatus(http.StatusForbidden, STATUS_MISSING_ID_PW), http.StatusForbidden)
 	return
@@ -773,7 +768,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	} else {
 		tokenData := &TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(tokenData, tokenConfig, a.Store); err != nil {
+		if sessionToken, err := CreateSessionToken(tokenData, tokenConfig); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
 
 		} else {
@@ -837,21 +832,19 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	// If the expected secret is the one given at the door then we can generate a token
 	if pw == expectedSecret {
 		//generate new token
-		if sessionToken, err := CreateSessionTokenAndSave(
+		if sessionToken, err := CreateSessionToken(
 			&TokenData{DurationSecs: extractTokenDuration(req), UserId: server, IsServer: true},
 			TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
-			a.Store,
 		); err != nil {
 			// Error generating the token
 			a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 			sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
-			return
 		} else {
 			// Server is provided with the generated token
 			a.logAudit(req, nil, "ServerLogin")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-			return
 		}
+		return
 	}
 	// If the password given at the door is wrong, we cannot generate the token
 	a.logger.Println(http.StatusUnauthorized, STATUS_PW_WRONG)
@@ -883,19 +876,16 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	}
 
 	//refresh
-	if sessionToken, err := CreateSessionTokenAndSave(
+	if sessionToken, err := CreateSessionToken(
 		td,
 		TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
-		a.Store,
 	); err != nil {
 		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
-		return
 	} else {
 		a.logAudit(req, td, "RefreshSession")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 		sendModelAsRes(res, td)
-		return
 	}
 }
 
@@ -974,9 +964,9 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 	if id := req.Header.Get(TP_SESSION_TOKEN); id != "" {
-		if err := a.Store.RemoveTokenByID(id); err != nil {
-			//silently fail but still log it
-			a.logger.Println("Logout was unable to delete token", err.Error())
+		if _, err := a.authenticateSessionToken(id); err != nil {
+			// Log the error
+			a.logger.Println("Logout called with an invalid token", err.Error())
 		}
 	}
 	// otherwise all good
@@ -1104,8 +1094,6 @@ func (a *Api) authenticateSessionToken(sessionToken string) (*TokenData, error) 
 	if sessionToken == "" {
 		return nil, errors.New("Session token is empty")
 	} else if tokenData, err := UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
-		return nil, err
-	} else if _, err := a.Store.FindTokenByID(sessionToken); err != nil {
 		return nil, err
 	} else {
 		return tokenData, nil

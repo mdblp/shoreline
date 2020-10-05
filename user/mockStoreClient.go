@@ -135,25 +135,3 @@ func (d MockStoreClient) RemoveUser(user *User) error {
 	}
 	return nil
 }
-
-func (d MockStoreClient) AddToken(token *SessionToken) error {
-	if d.doBad {
-		return errors.New("AddToken failure")
-	}
-	return nil
-}
-
-func (d MockStoreClient) FindTokenByID(id string) (*SessionToken, error) {
-	if d.doBad {
-		return nil, errors.New("FindTokenByID failure")
-	}
-	//`find` a pretend one we just made
-	return nil, nil
-}
-
-func (d MockStoreClient) RemoveTokenByID(id string) error {
-	if d.doBad {
-		return errors.New("RemoveTokenByID failure")
-	}
-	return nil
-}

@@ -471,12 +471,13 @@ func (u *User) IsClinic() bool {
 }
 
 func (u *User) HashPassword(pw, salt string) error {
-	if passwordHash, err := GeneratePasswordHash(u.Id, pw, salt); err != nil {
+	var passwordHash string
+	var err error
+	if passwordHash, err = GeneratePasswordHash(u.Id, pw, salt); err != nil {
 		return err
-	} else {
-		u.PwHash = passwordHash
-		return nil
 	}
+	u.PwHash = passwordHash
+	return nil
 }
 
 func (u *User) PasswordsMatch(pw, salt string) bool {

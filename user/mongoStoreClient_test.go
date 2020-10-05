@@ -32,7 +32,6 @@ func mgoTestSetup() (*Client, error) {
 }
 
 func TestMongoStoreUserOperations(t *testing.T) {
-
 	var (
 		usernameOriginal     = "test@foo.bar"
 		usernameOther        = "other@foo.bar"
@@ -256,49 +255,4 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 	} else if len(found) != 2 || found[0].Id != userOne.Id || found[1].Id != userTwo.Id {
 		t.Fatalf("should only find user ID %s but found %v", userTwo.Id, found)
 	}
-}
-
-func TestMongoStoreTokenOperations(t *testing.T) {
-
-	testing_token_data := &TokenData{UserId: "2341", IsServer: true, DurationSecs: 3600}
-	testing_token_config := TokenConfig{DurationSecs: 1200, Secret: "some secret for the tests"}
-
-	mc, err := mgoTestSetup()
-	if err != nil {
-		t.Fatalf("we initialise the test store %s", err.Error())
-	}
-
-	/*
-	 * THE TESTS
-	 */
-	sessionToken, _ := CreateSessionToken(
-		testing_token_data,
-		testing_token_config,
-	)
-
-	if err := mc.AddToken(sessionToken); err != nil {
-		t.Fatalf("we could not save the token %v", err)
-	}
-
-	if foundToken, err := mc.FindTokenByID(sessionToken.ID); err == nil {
-		if foundToken.ID == "" {
-			t.Fatalf("the token string isn't included %v", foundToken)
-		}
-		if foundToken.Time == 0 {
-			t.Fatalf("the time wasn't included %v", foundToken)
-		}
-	} else {
-		t.Fatalf("no token was returned when it should have been - err[%v]", err)
-	}
-
-	if err := mc.RemoveTokenByID(sessionToken.ID); err != nil {
-		t.Fatalf("we could not remove the token %v", err)
-	}
-
-	if token, err := mc.FindTokenByID(sessionToken.ID); err == nil {
-		if token != nil {
-			t.Fatalf("the token has been removed so we shouldn't find it %v", token)
-		}
-	}
-
 }
