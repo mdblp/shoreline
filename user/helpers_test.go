@@ -1,9 +1,9 @@
 package user
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
-	"net/http"
 )
 
 func Test_FirstStringNotEmpty_None(t *testing.T) {
@@ -45,9 +45,9 @@ func Test_AsSerializableUser_Interface(t *testing.T) {
 }
 
 func Test_AsSerializableUser_UserId(t *testing.T) {
-	user := &User{Id: "1234567890"}
+	user := &User{ID: "1234567890"}
 	serializableUser := shoreline.asSerializableUser(user, false).(map[string]interface{})
-	if len(serializableUser) != 1 || serializableUser["userid"] != user.Id {
+	if len(serializableUser) != 1 || serializableUser["userid"] != user.ID {
 		t.Fatalf("Serializable user [%#v] does not match User [%#v] for userid", serializableUser, user)
 	}
 }
@@ -144,7 +144,7 @@ func Test_appendUserLoginInProgress_RateLimitExceeded(t *testing.T) {
 	shoreline.loginLimiter.totalInProgress = shoreline.ApiConfig.MaxConcurrentLogin
 	shoreline.loginLimiter.usersInProgress.Init()
 	code, _ := shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusTooManyRequests) {
+	if code != http.StatusTooManyRequests {
 		t.Fatalf("appendUserLoginInProgress should return an http too many requests error when the limit is execedded")
 	}
 }
@@ -155,7 +155,7 @@ func Test_appendUserLoginInProgress_UserAlreadyLoginIn(t *testing.T) {
 	shoreline.loginLimiter.usersInProgress.Init()
 	code, _ := shoreline.appendUserLoginInProgress(user)
 	code, _ = shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusTooManyRequests) {
+	if code != http.StatusTooManyRequests {
 		t.Fatalf("appendUserLoginInProgress should return an http too many requests error when the user is in the in progress list")
 	}
 }
@@ -164,13 +164,13 @@ func Test_appendUserLoginInProgress_NoProblem(t *testing.T) {
 	resetLoginLimitConfig()
 	shoreline.loginLimiter.usersInProgress.Init()
 	code, _ := shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusOK) {
+	if code != http.StatusOK {
 		t.Fatalf("appendUserLoginInProgress should return an http status ok when the user is not in the in progress list")
 	}
-	if(shoreline.loginLimiter.totalInProgress != 1) {
+	if shoreline.loginLimiter.totalInProgress != 1 {
 		t.Fatalf("appendUserLoginInProgress should increment the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=1){
+	if shoreline.loginLimiter.usersInProgress.Len() != 1 {
 		t.Fatalf("appendUserLoginInProgress should add users into userInProgress list")
 	}
 }
@@ -182,28 +182,28 @@ func Test_appendUserLoginInProgress_BlockParallelDisabled(t *testing.T) {
 	shoreline.loginLimiter.totalInProgress = shoreline.ApiConfig.MaxConcurrentLogin
 	shoreline.loginLimiter.usersInProgress.Init()
 	code, _ := shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusTooManyRequests) {
+	if code != http.StatusTooManyRequests {
 		t.Fatalf("appendUserLoginInProgress should return an http too many requests error when the limit is execedded")
 	}
 	shoreline.loginLimiter.totalInProgress = 0
 	code, _ = shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusOK) {
+	if code != http.StatusOK {
 		t.Fatalf("appendUserLoginInProgress should return an http status ok when BlockParallelLogin config is set to false")
 	}
-	if(shoreline.loginLimiter.totalInProgress != 1) {
+	if shoreline.loginLimiter.totalInProgress != 1 {
 		t.Fatalf("appendUserLoginInProgress should increment the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=0){
+	if shoreline.loginLimiter.usersInProgress.Len() != 0 {
 		t.Fatalf("appendUserLoginInProgress should leave the userInProgress list empty when BlockParallelLogin config is set to false")
 	}
 	code, _ = shoreline.appendUserLoginInProgress(user)
-	if(code != http.StatusOK) {
+	if code != http.StatusOK {
 		t.Fatalf("appendUserLoginInProgress should return an http status ok when BlockParallelLogin config is set to false")
 	}
-	if(shoreline.loginLimiter.totalInProgress != 2) {
+	if shoreline.loginLimiter.totalInProgress != 2 {
 		t.Fatalf("appendUserLoginInProgress should increment the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=0){
+	if shoreline.loginLimiter.usersInProgress.Len() != 0 {
 		t.Fatalf("appendUserLoginInProgress should leave the userInProgress list empty when BlockParallelLogin config is set to false")
 	}
 }
@@ -214,10 +214,10 @@ func Test_removeUserLoginInProgress(t *testing.T) {
 	shoreline.loginLimiter.usersInProgress.Init()
 	_, elem := shoreline.appendUserLoginInProgress(user)
 	shoreline.removeUserLoginInProgress(elem)
-	if(shoreline.loginLimiter.totalInProgress != 0) {
+	if shoreline.loginLimiter.totalInProgress != 0 {
 		t.Fatalf("removeUserLoginInProgress should decrement the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=0){
+	if shoreline.loginLimiter.usersInProgress.Len() != 0 {
 		t.Fatalf("removeUserLoginInProgress should remove users from userInProgress list")
 	}
 }
@@ -229,20 +229,20 @@ func Test_removeUserLoginInProgress_BlockParallelDisabled(t *testing.T) {
 	shoreline.loginLimiter.usersInProgress.Init()
 	_, elem := shoreline.appendUserLoginInProgress(user)
 	shoreline.removeUserLoginInProgress(elem)
-	if(shoreline.loginLimiter.totalInProgress != 0) {
+	if shoreline.loginLimiter.totalInProgress != 0 {
 		t.Fatalf("removeUserLoginInProgress should decrement the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=0){
+	if shoreline.loginLimiter.usersInProgress.Len() != 0 {
 		t.Fatalf("removeUserLoginInProgress should leave the userInProgress list empty when BlockParallelLogin config is set to false")
 	}
 
 	_, elem = shoreline.appendUserLoginInProgress(user)
-	shoreline.appendUserLoginInProgress( &User{Username: "test4@test.com"})
+	shoreline.appendUserLoginInProgress(&User{Username: "test4@test.com"})
 	shoreline.removeUserLoginInProgress(elem)
-	if(shoreline.loginLimiter.totalInProgress != 1) {
+	if shoreline.loginLimiter.totalInProgress != 1 {
 		t.Fatalf("removeUserLoginInProgress should decrement the total login counter")
 	}
-	if(shoreline.loginLimiter.usersInProgress.Len() !=0){
+	if shoreline.loginLimiter.usersInProgress.Len() != 0 {
 		t.Fatalf("removeUserLoginInProgress should leave the userInProgress list empty when BlockParallelLogin config is set to false")
 	}
 }

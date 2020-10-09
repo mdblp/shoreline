@@ -139,12 +139,12 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	}
 
 	//By Id
-	toFindById := &User{Id: user.Id}
+	toFindByID := &User{ID: user.ID}
 
-	if found, err := mc.FindUser(toFindById); err != nil {
+	if found, err := mc.FindUser(toFindByID); err != nil {
 		t.Fatalf("we could not find the the user by id err[%v]", err)
 	} else {
-		if found.Id != toFindById.Id {
+		if found.ID != toFindByID.ID {
 			t.Fatalf("the user we found doesn't match what we asked for %v", found)
 		}
 	}
@@ -238,21 +238,21 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 		t.Fatalf("we could not create the user %v", err)
 	}
 
-	if found, err := mc.FindUsersWithIds([]string{userOne.Id}); err != nil {
+	if found, err := mc.FindUsersWithIds([]string{userOne.ID}); err != nil {
 		t.Fatalf("error finding users by role %s", err.Error())
-	} else if len(found) != 1 || found[0].Id != userOne.Id {
-		t.Fatalf("should only find user ID %s but found %v", userOne.Id, found)
+	} else if len(found) != 1 || found[0].ID != userOne.ID {
+		t.Fatalf("should only find user ID %s but found %v", userOne.ID, found)
 	}
 
-	if found, err := mc.FindUsersWithIds([]string{userTwo.Id}); err != nil {
+	if found, err := mc.FindUsersWithIds([]string{userTwo.ID}); err != nil {
 		t.Fatalf("error finding users by role %s", err.Error())
-	} else if len(found) != 1 || found[0].Id != userTwo.Id {
-		t.Fatalf("should only find user ID %s but found %v", userTwo.Id, found)
+	} else if len(found) != 1 || found[0].ID != userTwo.ID {
+		t.Fatalf("should only find user ID %s but found %v", userTwo.ID, found)
 	}
 
-	if found, err := mc.FindUsersWithIds([]string{userOne.Id, userTwo.Id}); err != nil {
+	if found, err := mc.FindUsersWithIds([]string{userOne.ID, userTwo.ID}); err != nil {
 		t.Fatalf("error finding users by role %s", err.Error())
-	} else if len(found) != 2 || found[0].Id != userOne.Id || found[1].Id != userTwo.Id {
-		t.Fatalf("should only find user ID %s but found %v", userTwo.Id, found)
+	} else if len(found) != 2 || found[0].ID != userOne.ID || found[1].ID != userTwo.ID {
+		t.Fatalf("should only find user ID %s but found %v", userTwo.ID, found)
 	}
 }

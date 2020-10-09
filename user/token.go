@@ -10,66 +10,89 @@ import (
 )
 
 type (
+	// SessionToken to be stored in database
 	SessionToken struct {
 		ID        string `json:"-" bson:"_id"`
 		IsServer  bool   `json:"isServer" bson:"isServer"`
-		ServerID  string `json:"-" bson:"serverId,omitempty"`
-		UserID    string `json:"userId,omitempty" bson:"userId,omitempty"`
-		Duration  int64  `json:"-" bson:"duration"`
+		ServerID  string `json:"-" bson:"serverid,omitempty"`
+		UserID    string `json:"userid,omitempty" bson:"userid,omitempty"`
 		ExpiresAt int64  `json:"-" bson:"expiresAt"`
-		CreatedAt int64  `json:"-" bson:"createdAt"`
-		Time      int64  `json:"-" bson:"time"`
+		IssuedAt  int64  `json:"-" bson:"issuedAt"`
+		Extended  bool   `json:"-" bson:"extended"`
 	}
 
+	// TokenData what is sent in the JWT token
 	TokenData struct {
-		IsServer     bool   `json:"isserver"`
-		UserId       string `json:"userid"`
-		DurationSecs int64  `json:"-"`
+		IsServer     bool     `json:"isserver"`
+		UserID       string   `json:"userid"`
+		UserRoles    []string `json:"roles"`
+		DurationSecs int64    `json:"-"`
 	}
 
+	tokenClaims struct {
+		IsServer  string   `json:"svr"`
+		UserID    string   `json:"usr"`
+		UserRoles []string `json:"roles,omitempty"`
+		Extended  bool     `json:"ext,omitempty"`
+		jwt.StandardClaims
+	}
+
+	// TokenConfig from service config
 	TokenConfig struct {
 		Secret       string
 		DurationSecs int64
 	}
+
+	mapClaims map[string]interface{}
 )
 
 const (
-	TOKEN_DURATION_KEY = "tokenduration"
+	// TokenDurationKey duration wanted for a login token (HTTP header key)
+	TokenDurationKey = "tokenduration"
+	tokenSignMethod  = "HS256"
 )
 
 var (
-	SessionToken_error_no_userid        = errors.New("SessionToken: userId not set")
-	SessionToken_invalid                = errors.New("SessionToken: is invalid")
-	SessionToken_error_duration_not_set = errors.New("SessionToken: duration not set")
+	errSessionTokenErrorNoUserID = errors.New("SessionToken: userId not set")
+	errSessionTokenInvalid       = errors.New("SessionToken: is invalid")
 )
 
+// CreateSessionToken Create a new JWT token
 func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, error) {
-	if data.UserId == "" {
-		return nil, SessionToken_error_no_userid
+	if data.UserID == "" {
+		return nil, errSessionTokenErrorNoUserID
 	}
 
+	extended := false
 	if data.DurationSecs == 0 {
 		if data.IsServer {
 			data.DurationSecs = 24 * 60 * 60
 		} else {
 			data.DurationSecs = config.DurationSecs
 		}
+	} else {
+		extended = true
 	}
 
-	now := time.Now()
-	createdAt := now.Unix()
+	now := time.Now().UTC()
+	issuedAt := now.Unix()
 	expiresAt := now.Add(time.Duration(data.DurationSecs) * time.Second).Unix()
 
-	token := jwt.New(jwt.GetSigningMethod("HS256"))
-	claims := token.Claims.(jwt.MapClaims)
-	if data.IsServer {
-		claims["svr"] = "yes"
-	} else {
-		claims["svr"] = "no"
+	claims := &tokenClaims{
+		UserID: data.UserID,
 	}
-	claims["usr"] = data.UserId
-	claims["dur"] = data.DurationSecs
-	claims["exp"] = expiresAt
+	if data.IsServer {
+		claims.IsServer = "yes"
+	} else {
+		claims.IsServer = "no"
+		claims.UserRoles = data.UserRoles
+	}
+	claims.ExpiresAt = expiresAt
+	claims.IssuedAt = issuedAt
+	if extended {
+		claims.Extended = true
+	}
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(tokenSignMethod), claims)
 
 	tokenString, err := token.SignedString([]byte(config.Secret))
 	if err != nil {
@@ -79,51 +102,75 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	sessionToken := &SessionToken{
 		ID:        tokenString,
 		IsServer:  data.IsServer,
-		Duration:  data.DurationSecs,
 		ExpiresAt: expiresAt,
-		CreatedAt: createdAt,
-		Time:      createdAt,
+		IssuedAt:  issuedAt,
+		Extended:  extended,
 	}
 	if data.IsServer {
-		sessionToken.ServerID = data.UserId
+		sessionToken.ServerID = data.UserID
 	} else {
-		sessionToken.UserID = data.UserId
+		sessionToken.UserID = data.UserID
 	}
 
 	return sessionToken, nil
 }
 
-func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
+func createSessionTokenAndSave(data *TokenData, config TokenConfig, store Storage) (*SessionToken, error) {
+	sessionToken, err := CreateSessionToken(data, config)
+	if err != nil {
+		return nil, err
+	}
+	return sessionToken, nil
+}
+
+func unpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if id == "" {
-		return nil, SessionToken_error_no_userid
+		return nil, errSessionTokenErrorNoUserID
+	}
+	keyFunc := func(t *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
 	}
 
-	jwtToken, err := jwt.Parse(id, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil })
+	parser := new(jwt.Parser)
+	parser.ValidMethods = []string{tokenSignMethod}
+	parser.SkipClaimsValidation = false
+	parser.UseJSONNumber = true
+	jwtToken, err := parser.ParseWithClaims(id, &tokenClaims{}, keyFunc)
 	if err != nil {
 		return nil, err
 	}
 	if !jwtToken.Valid {
-		return nil, SessionToken_invalid
+		return nil, errSessionTokenInvalid
 	}
 
-	claims := jwtToken.Claims.(jwt.MapClaims)
-	isServer := claims["svr"] == "yes"
-	durationSecs, ok := claims["dur"].(int64)
-	if !ok {
-		durationSecs = int64(claims["dur"].(float64))
-	}
-	userId := claims["usr"].(string)
+	claims := jwtToken.Claims.(*tokenClaims)
 
-	return &TokenData{
+	if !claims.VerifyExpiresAt(time.Now().UTC().Unix(), true) {
+		return nil, errSessionTokenInvalid
+	}
+
+	isServer := claims.IsServer == "yes"
+	userID := claims.UserID
+	issuedAt := claims.IssuedAt
+	expiresAt := claims.ExpiresAt
+	durationSecs := expiresAt - issuedAt
+
+	tokenData := &TokenData{
 		IsServer:     isServer,
+		UserID:       userID,
 		DurationSecs: durationSecs,
-		UserId:       userId,
-	}, nil
+	}
+
+	if !isServer {
+		tokenData.UserRoles = claims.UserRoles
+	}
+
+	return tokenData, nil
 }
 
 func extractTokenDuration(r *http.Request) int64 {
 
-	durString := r.Header.Get(TOKEN_DURATION_KEY)
+	durString := r.Header.Get(TokenDurationKey)
 
 	if durString != "" {
 		//if there is an error we just return a duration of zero
@@ -136,7 +183,7 @@ func extractTokenDuration(r *http.Request) int64 {
 }
 
 func hasServerToken(tokenString, secret string) bool {
-	td, err := UnpackSessionTokenAndVerify(tokenString, secret)
+	td, err := unpackSessionTokenAndVerify(tokenString, secret)
 	if err != nil {
 		return false
 	}

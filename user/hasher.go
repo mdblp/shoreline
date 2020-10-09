@@ -12,7 +12,6 @@ import (
 )
 
 func generateUniqueHash(strings []string, length int) (string, error) {
-
 	if len(strings) > 0 && length > 0 {
 
 		hash := sha256.New()
@@ -40,7 +39,6 @@ func generateUniqueHash(strings []string, length int) (string, error) {
 }
 
 func GeneratePasswordHash(id, pw, salt string) (string, error) {
-
 	if salt == "" || id == "" {
 		return "", errors.New("id and salt are required")
 	}

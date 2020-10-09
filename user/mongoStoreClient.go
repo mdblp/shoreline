@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	USERS_COLLECTION  = "users"
-	TOKENS_COLLECTION = "tokens"
+	usersCollection = "users"
 )
 
 // Client struct
@@ -32,11 +31,7 @@ func NewStore(config *goComMgo.Config, logger *log.Logger) (*Client, error) {
 }
 
 func mgoUsersCollection(c *Client) *mongo.Collection {
-	return c.Collection(USERS_COLLECTION)
-}
-
-func mgoTokensCollection(c *Client) *mongo.Collection {
-	return c.Collection(TOKENS_COLLECTION)
+	return c.Collection(usersCollection)
 }
 
 func (c *Client) UpsertUser(user *User) error {
@@ -46,15 +41,14 @@ func (c *Client) UpsertUser(user *User) error {
 	options := options.Update().SetUpsert(true)
 	update := bson.D{{"$set", user}}
 	// if the user already exists we update otherwise we add
-	_, err := mgoUsersCollection(c).UpdateOne(c.Context, bson.M{"userid": user.Id}, update, options)
+	_, err := mgoUsersCollection(c).UpdateOne(c.Context, bson.M{"userid": user.ID}, update, options)
 	return err
 }
 
 func (c *Client) FindUser(user *User) (result *User, err error) {
-
-	if user.Id != "" {
+	if user.ID != "" {
 		opts := options.FindOne()
-		if err = mgoUsersCollection(c).FindOne(c.Context, bson.M{"userid": user.Id}, opts).Decode(&result); err != nil {
+		if err = mgoUsersCollection(c).FindOne(c.Context, bson.M{"userid": user.ID}, opts).Decode(&result); err != nil {
 			return result, err
 		}
 	}
@@ -81,11 +75,10 @@ func (c *Client) findUsers(filter interface{}, noResultMessage string) (results 
 }
 
 func (c *Client) FindUsers(user *User) (results []*User, err error) {
-
 	fieldsToMatch := []bson.M{}
 
-	if user.Id != "" {
-		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.Id})
+	if user.ID != "" {
+		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.ID})
 	}
 	if user.Username != "" {
 		regexFilter := primitive.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(user.Username)), Options: "i"}
@@ -98,7 +91,7 @@ func (c *Client) FindUsers(user *User) (results []*User, err error) {
 	if len(fieldsToMatch) == 0 {
 		return []*User{}, nil
 	}
-	noUserMessage := fmt.Sprintf("no users found: query: (Id = %v) OR (Name ~= %v) OR (Emails IN %v)", user.Id, user.Username, user.Emails)
+	noUserMessage := fmt.Sprintf("no users found: query: (Id = %v) OR (Name ~= %v) OR (Emails IN %v)", user.ID, user.Username, user.Emails)
 	return c.findUsers(bson.M{"$or": fieldsToMatch}, noUserMessage)
 }
 
@@ -113,31 +106,7 @@ func (c *Client) FindUsersWithIds(ids []string) (results []*User, err error) {
 }
 
 func (c *Client) RemoveUser(user *User) (err error) {
-	if _, err := mgoUsersCollection(c).DeleteOne(c.Context, bson.M{"userid": user.Id}); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) AddToken(st *SessionToken) error {
-	options := options.Update().SetUpsert(true)
-	update := bson.D{{"$set", st}}
-	// if the user already exists we update otherwise we add
-	_, err := mgoTokensCollection(c).UpdateOne(c.Context, bson.M{"_id": st.ID}, update, options)
-	return err
-}
-
-func (c *Client) FindTokenByID(id string) (*SessionToken, error) {
-	opts := options.FindOne()
-	sessionToken := &SessionToken{}
-	if err := mgoTokensCollection(c).FindOne(c.Context, bson.M{"_id": id}, opts).Decode(sessionToken); err != nil {
-		return nil, err
-	}
-	return sessionToken, nil
-}
-
-func (c *Client) RemoveTokenByID(id string) (err error) {
-	if _, err := mgoTokensCollection(c).DeleteOne(c.Context, bson.M{"_id": id}); err != nil {
+	if _, err := mgoUsersCollection(c).DeleteOne(c.Context, bson.M{"userid": user.ID}); err != nil {
 		return err
 	}
 	return nil

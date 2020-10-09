@@ -20,7 +20,7 @@ var tokenConfig = TokenConfig{
 func Test_GenerateSessionToken(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 3600},
+		data:   &TokenData{UserID: "12-99-100", IsServer: false, DurationSecs: 3600},
 		config: tokenConfig,
 	}
 
@@ -31,7 +31,7 @@ func Test_GenerateSessionToken(t *testing.T) {
 		t.Fatalf("should generate a session token with an ID set")
 	}
 
-	td, _ := UnpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
+	td, _ := unpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
 
 	if td.DurationSecs != testData.data.DurationSecs {
 		t.Fatalf("we should use the DurationSecs if given")
@@ -41,18 +41,18 @@ func Test_GenerateSessionToken(t *testing.T) {
 func Test_GenerateSessionToken_DurationFromConfig(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 0},
+		data:   &TokenData{UserID: "12-99-100", IsServer: false, DurationSecs: 0},
 		config: tokenConfig,
 	}
 
 	//given duration seconds trump the configured duration
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	if token.ID == "" || token.Time == 0 {
+	if token.ID == "" || token.IssuedAt == 0 {
 		t.Fatalf("should generate a session token")
 	}
 
-	td, _ := UnpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
+	td, _ := unpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
 
 	if td.DurationSecs != tokenConfig.DurationSecs {
 		t.Fatalf("the duration should be from config")
@@ -62,17 +62,17 @@ func Test_GenerateSessionToken_DurationFromConfig(t *testing.T) {
 func Test_GenerateSessionToken_DurationSecsTrumpConfig(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5},
+		data:   &TokenData{UserID: "12-99-100", IsServer: false, DurationSecs: 5},
 		config: tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	if token.ID == "" || token.Time == 0 {
+	if token.ID == "" || token.IssuedAt == 0 {
 		t.Fatalf("should generate a session token")
 	}
 
-	td, _ := UnpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
+	td, _ := unpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
 
 	if td.DurationSecs != testData.data.DurationSecs {
 		t.Fatalf("the duration should come from the token data")
@@ -83,7 +83,7 @@ func Test_GenerateSessionToken_DurationSecsTrumpConfig(t *testing.T) {
 func Test_GenerateSessionToken_NoUserId(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "", IsServer: false, DurationSecs: 3600},
+		data:   &TokenData{UserID: "", IsServer: false, DurationSecs: 3600},
 		config: tokenConfig,
 	}
 
@@ -95,17 +95,17 @@ func Test_GenerateSessionToken_NoUserId(t *testing.T) {
 func Test_GenerateSessionToken_Server(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "shoreline", IsServer: true, DurationSecs: 0},
+		data:   &TokenData{UserID: "shoreline", IsServer: true, DurationSecs: 0},
 		config: tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	if token.ID == "" || token.Time == 0 {
+	if token.ID == "" || token.IssuedAt == 0 {
 		t.Fatalf("should generate a session token")
 	}
 
-	td, _ := UnpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
+	td, _ := unpackSessionTokenAndVerify(token.ID, tokenConfig.Secret)
 
 	if td.IsServer != true {
 		t.Fatal("this should be a server token")
@@ -120,13 +120,13 @@ func Test_GenerateSessionToken_Server(t *testing.T) {
 func Test_UnpackedData(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "111", IsServer: true, DurationSecs: 0},
+		data:   &TokenData{UserID: "111", IsServer: true, DurationSecs: 0},
 		config: tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	data, err := UnpackSessionTokenAndVerify(token.ID, testData.config.Secret)
+	data, err := unpackSessionTokenAndVerify(token.ID, testData.config.Secret)
 	if err != nil {
 		t.Fatal("unpacked token should be valid", err.Error())
 	}
@@ -139,7 +139,7 @@ func Test_UnpackedData(t *testing.T) {
 		t.Fatal("the DurationSecs should have been what was given")
 	}
 
-	if data.UserId != testData.data.UserId {
+	if data.UserID != testData.data.UserID {
 		t.Fatal("the user should have been what was given")
 	}
 
@@ -148,7 +148,7 @@ func Test_UnpackedData(t *testing.T) {
 func Test_UnpackTokenExpires(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1},
+		data:   &TokenData{UserID: "2341", IsServer: false, DurationSecs: 1},
 		config: tokenConfig,
 	}
 
@@ -156,7 +156,7 @@ func Test_UnpackTokenExpires(t *testing.T) {
 
 	time.Sleep(2 * time.Second) //ensure token expires
 
-	data, err := UnpackSessionTokenAndVerify(token.ID, testData.config.Secret)
+	data, err := unpackSessionTokenAndVerify(token.ID, testData.config.Secret)
 
 	if data != nil {
 		t.Fatal("the token should have expired")
@@ -171,13 +171,13 @@ func Test_UnpackTokenExpires(t *testing.T) {
 func Test_UnpackAndVerifyStoredToken(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1200},
+		data:   &TokenData{UserID: "2341", IsServer: false, DurationSecs: 1200},
 		config: tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	_, err := UnpackSessionTokenAndVerify(token.ID, testData.config.Secret)
+	_, err := unpackSessionTokenAndVerify(token.ID, testData.config.Secret)
 
 	if err != nil {
 		t.Fatal("the token should be valid", err.Error())
@@ -190,7 +190,7 @@ func Test_extractTokenDuration(t *testing.T) {
 	request, _ := http.NewRequest("GET", "", nil)
 	givenDuration := strconv.FormatFloat(float64(10), 'f', -1, 64)
 
-	request.Header.Add(TOKEN_DURATION_KEY, givenDuration)
+	request.Header.Add(TokenDurationKey, givenDuration)
 
 	duration := extractTokenDuration(request)
 
@@ -203,17 +203,17 @@ func Test_extractTokenDuration(t *testing.T) {
 func Test_getUnpackedToken(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1},
+		data:   &TokenData{UserID: "2341", IsServer: false, DurationSecs: 1},
 		config: tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
 
-	td, err := UnpackSessionTokenAndVerify(token.ID, testData.config.Secret)
+	td, err := unpackSessionTokenAndVerify(token.ID, testData.config.Secret)
 	if err != nil {
 		t.Fatal("We should have got TokenData")
 	}
-	if td.UserId != testData.data.UserId {
+	if td.UserID != testData.data.UserID {
 		t.Fatalf("got %v expected %v ", td, testData.data)
 	}
 
@@ -222,7 +222,7 @@ func Test_getUnpackedToken(t *testing.T) {
 func Test_hasServerToken(t *testing.T) {
 
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "2341", IsServer: true, DurationSecs: 1},
+		data:   &TokenData{UserID: "2341", IsServer: true, DurationSecs: 1},
 		config: tokenConfig,
 	}
 
@@ -235,7 +235,7 @@ func Test_hasServerToken(t *testing.T) {
 
 func Test_hasServerToken_false(t *testing.T) {
 	testData := tokenTestData{
-		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1},
+		data:   &TokenData{UserID: "2341", IsServer: false, DurationSecs: 1},
 		config: tokenConfig,
 	}
 

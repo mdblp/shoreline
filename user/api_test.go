@@ -52,7 +52,7 @@ var (
 	TOKEN_DURATION = int64(3600)
 	FAKE_CONFIG    = ApiConfig{
 		Secrets: []Secret{Secret{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
-			Secret{Secret: "product_website", Pass: "Not so secret"}},
+			{Secret: "product_website", Pass: "Not so secret"}},
 		Secret:                      "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
 		TokenDurationSecs:           TOKEN_DURATION,
 		LongTermKey:                 "thelongtermkey",
@@ -75,9 +75,9 @@ var (
 	 * users and tokens
 	 */
 	TOKEN_CONFIG  = TokenConfig{DurationSecs: FAKE_CONFIG.TokenDurationSecs, Secret: FAKE_CONFIG.Secret}
-	USR           = &User{Id: "123-99-100", Username: "test@new.bar", Emails: []string{"test@new.bar"}}
-	USR_TOKEN, _  = CreateSessionToken(&TokenData{UserId: USR.Id, IsServer: false, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
-	SRVR_TOKEN, _ = CreateSessionToken(&TokenData{UserId: "shoreline", IsServer: true, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
+	USR           = &User{ID: "123-99-100", Username: "test@new.bar", Emails: []string{"test@new.bar"}}
+	USR_TOKEN, _  = CreateSessionToken(&TokenData{UserID: USR.ID, IsServer: false, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
+	SRVR_TOKEN, _ = CreateSessionToken(&TokenData{UserID: "shoreline", IsServer: true, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
 	/*
 	 * basics setup
 	 */
@@ -134,7 +134,7 @@ func T_CreateAuthorization(t *testing.T, email string, password string) string {
 }
 
 func T_CreateSessionToken(t *testing.T, userId string, isServer bool, duration int64) *SessionToken {
-	sessionToken, err := CreateSessionToken(&TokenData{UserId: userId, IsServer: isServer, DurationSecs: duration}, TOKEN_CONFIG)
+	sessionToken, err := CreateSessionToken(&TokenData{UserID: userId, IsServer: isServer, DurationSecs: duration}, TOKEN_CONFIG)
 	if err != nil {
 		t.Fatalf("Error creating session token: %#v", err)
 	}
@@ -446,7 +446,7 @@ func FindUsersWithIds(t *testing.T, userIds []string) {
 	}
 
 	for index, user := range userIds {
-		if user != users[index].Id {
+		if user != users[index].ID {
 			t.Fatalf("Expected user with ID '%s'. Got %#v", user, users[index])
 		}
 	}
@@ -471,7 +471,7 @@ func Test_GetUsers_Error_FindUsersByRoleError(t *testing.T) {
 
 func Test_GetUsers_Error_FindUsersByRoleSuccess(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{{Id: "0000000000"}, {Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{{ID: "0000000000"}, {ID: "1111111111"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -513,7 +513,7 @@ func Test_CreateUser_Error_ErrorFindingUsers(t *testing.T) {
 }
 
 func Test_CreateUser_Error_ConflictingEmail(t *testing.T) {
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"password\": \"12345678\"}"
@@ -551,7 +551,7 @@ func Test_CreateUser_Success(t *testing.T) {
 	body := "{\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"password\": \"12345678\", \"roles\": [\"clinic\"]}"
 	response := T_PerformRequestBody(t, "POST", "/user", body)
 	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 201)
-	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{24}\z`, true)
 	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": false, "emails": []interface{}{"a@z.co"}, "username": "a@z.co", "roles": []interface{}{"clinic"}})
 	if response.Header().Get(TP_SESSION_TOKEN) == "" {
 		t.Fatalf("Missing expected %s header", TP_SESSION_TOKEN)
@@ -624,7 +624,7 @@ func Test_CreateCustodialUser_Error_FindUsersError(t *testing.T) {
 
 func Test_CreateCustodialUser_Error_FindUsersDuplicate(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", false, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"]}"
@@ -673,8 +673,8 @@ func Test_CreateCustodialUser_Success_Anonymous(t *testing.T) {
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestBodyHeaders(t, "POST", "/user/abcdef1234/user", body, headers)
 	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 201)
-	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
-	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{})
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{24}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"roles": []interface{}{"guest"}})
 }
 
 func Test_CreateCustodialUser_Success_Anonymous_Server(t *testing.T) {
@@ -689,8 +689,8 @@ func Test_CreateCustodialUser_Success_Anonymous_Server(t *testing.T) {
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestBodyHeaders(t, "POST", "/user/0000000000/user", body, headers)
 	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 201)
-	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
-	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"passwordExists": false})
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{24}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"passwordExists": false, "roles": []interface{}{"guest"}})
 }
 
 func Test_CreateCustodialUser_Success_Known(t *testing.T) {
@@ -705,8 +705,8 @@ func Test_CreateCustodialUser_Success_Known(t *testing.T) {
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestBodyHeaders(t, "POST", "/user/abcdef1234/user", body, headers)
 	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 201)
-	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
-	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": false, "emails": []interface{}{"a@z.co"}, "username": "a@z.co"})
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{24}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": false, "emails": []interface{}{"a@z.co"}, "username": "a@z.co", "roles": []interface{}{"guest"}})
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -766,7 +766,7 @@ func Test_UpdateUser_Error_FindUsersMissing(t *testing.T) {
 
 func Test_UpdateUser_Error_PermissionsError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -779,7 +779,7 @@ func Test_UpdateUser_Error_PermissionsError(t *testing.T) {
 
 func Test_UpdateUser_Error_NoPermissions(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -792,7 +792,7 @@ func Test_UpdateUser_Error_NoPermissions(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedRoles_User(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"roles\": [\"clinic\"]}}"
@@ -804,7 +804,7 @@ func Test_UpdateUser_Error_UnauthorizedRoles_User(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedRoles_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -817,7 +817,7 @@ func Test_UpdateUser_Error_UnauthorizedRoles_Custodian(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedEmailVerified_User(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"emailVerified\": true}}"
@@ -829,7 +829,7 @@ func Test_UpdateUser_Error_UnauthorizedEmailVerified_User(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedEmailVerified_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -842,7 +842,7 @@ func Test_UpdateUser_Error_UnauthorizedEmailVerified_Custodian(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedPassword_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -855,7 +855,7 @@ func Test_UpdateUser_Error_UnauthorizedPassword_Custodian(t *testing.T) {
 
 func Test_UpdateUser_Error_UnauthorizedTermsAccepted_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -868,7 +868,7 @@ func Test_UpdateUser_Error_UnauthorizedTermsAccepted_Custodian(t *testing.T) {
 
 func Test_UpdateUser_Error_FindUserDuplicateError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
@@ -882,9 +882,9 @@ func Test_UpdateUser_Error_FindUserDuplicateError(t *testing.T) {
 
 func Test_UpdateUser_Error_FindUserDuplicateFound(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1234567890"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1234567890"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"]}}"
@@ -896,9 +896,9 @@ func Test_UpdateUser_Error_FindUserDuplicateFound(t *testing.T) {
 
 func Test_UpdateUser_Error_FindUserDuplicateFound2(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1234567890"}, &User{Id: "1234567898"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1234567890"}, {ID: "1234567898"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"]}}"
@@ -910,7 +910,7 @@ func Test_UpdateUser_Error_FindUserDuplicateFound2(t *testing.T) {
 
 func Test_UpdateUser_Error_UpsertUserError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{errors.New("ERROR")}
@@ -925,7 +925,7 @@ func Test_UpdateUser_Error_UpsertUserError(t *testing.T) {
 
 func Test_UpdateUser_Error_RemoveCustodians_UsersInGroupError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{}, errors.New("ERROR")}}
@@ -940,7 +940,7 @@ func Test_UpdateUser_Error_RemoveCustodians_UsersInGroupError(t *testing.T) {
 
 func Test_UpdateUser_Error_RemoveCustodians_SetPermissionsError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
@@ -956,7 +956,7 @@ func Test_UpdateUser_Error_RemoveCustodians_SetPermissionsError(t *testing.T) {
 
 func Test_UpdateUser_Success_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -973,7 +973,7 @@ func Test_UpdateUser_Success_Custodian(t *testing.T) {
 
 func Test_UpdateUser_Success_UserFromUrl(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
@@ -991,8 +991,8 @@ func Test_UpdateUser_Success_UserFromUrl(t *testing.T) {
 
 func Test_UpdateUser_Success_UserWithUnchangedUsername(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
 	responsableGatekeeper.SetPermissionsResponses = []PermissionsResponse{{clients.Permissions{}, nil}}
@@ -1009,7 +1009,7 @@ func Test_UpdateUser_Success_UserWithUnchangedUsername(t *testing.T) {
 
 func Test_UpdateUser_Success_UserFromToken(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
@@ -1027,7 +1027,7 @@ func Test_UpdateUser_Success_UserFromToken(t *testing.T) {
 
 func Test_UpdateUser_Success_Server_WithoutPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
@@ -1043,7 +1043,7 @@ func Test_UpdateUser_Success_Server_WithoutPassword(t *testing.T) {
 
 func Test_UpdateUser_Success_Server_WithPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
-	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{ID: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	responsableGatekeeper.UsersInGroupResponses = []UsersPermissionsResponse{{clients.UsersPermissions{"0000000000": {"custodian": clients.Allowed}}, nil}}
@@ -1101,7 +1101,7 @@ func Test_GetUserInfo_Error_FindUsersNil(t *testing.T) {
 
 func Test_GetUserInfo_Error_PermissionsError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111"}}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1113,7 +1113,7 @@ func Test_GetUserInfo_Error_PermissionsError(t *testing.T) {
 
 func Test_GetUserInfo_Error_NoPermissions(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111"}}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"a": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1124,21 +1124,26 @@ func Test_GetUserInfo_Error_NoPermissions(t *testing.T) {
 }
 
 func Test_GetUserInfo_Success_User(t *testing.T) {
-	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
+	var userID string
+	var err error
+	username := "a@z.co"
+	if userID, err = generateUniqueHash([]string{username}, 24); err != nil {
+	}
+	sessionToken := T_CreateSessionToken(t, userID, false, TOKEN_DURATION)
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: userID, Username: username, Emails: []string{username}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
-	response := T_PerformRequestHeaders(t, "GET", "/user/1111111111", headers)
+	response := T_PerformRequestHeaders(t, "GET", "/user/"+userID, headers)
 	successResponse := T_ExpectSuccessResponseWithJSONMap(t, response, 200)
-	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{10}\z`, true)
-	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": true, "emails": []interface{}{"a@z.co"}, "username": "a@z.co", "termsAccepted": "2016-01-01T01:23:45-08:00"})
+	T_ExpectElementMatch(t, successResponse, "userid", `\A[0-9a-f]{24}\z`, true)
+	T_ExpectEqualsMap(t, successResponse, map[string]interface{}{"emailVerified": true, "emails": []interface{}{username}, "username": username, "termsAccepted": "2016-01-01T01:23:45-08:00"})
 }
 
 func Test_GetUserInfo_Success_Custodian(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz"}}, nil}}
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"custodian": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1152,7 +1157,7 @@ func Test_GetUserInfo_Success_Custodian(t *testing.T) {
 
 func Test_GetUserInfo_Success_Server(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1230,7 +1235,7 @@ func TestDeleteUser_StatusAccepted(t *testing.T) {
 
 	shoreline.SetHandlers("", rtr)
 
-	shoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+	shoreline.DeleteUser(response, request, map[string]string{"userid": USR.ID})
 
 	if response.Code != http.StatusAccepted {
 		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusAccepted, response.Code)
@@ -1307,7 +1312,7 @@ func Test_Login_Error_FindUsersNil(t *testing.T) {
 
 func Test_Login_Error_NoPassword(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1319,7 +1324,7 @@ func Test_Login_Error_NoPassword(t *testing.T) {
 
 func Test_Login_Error_PasswordMismatch(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "MISMATCH")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1333,7 +1338,7 @@ func Test_Login_Error_AccountLock(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
 	nextAttemptTime := time.Now().Add(time.Minute * time.Duration(FAKE_CONFIG.DelayBeforeNextLoginAttempt))
 	user := User{
-		Id:     "1111111111",
+		ID:     "1111111111",
 		PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5",
 		FailedLogin: &FailedLoginInfos{
 			Count:                5,
@@ -1352,7 +1357,7 @@ func Test_Login_Error_AccountLock(t *testing.T) {
 
 func Test_Login_Error_EmailNotVerified(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1363,7 +1368,7 @@ func Test_Login_Error_EmailNotVerified(t *testing.T) {
 
 func Test_Login_Success(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1379,7 +1384,7 @@ func Test_Login_Success(t *testing.T) {
 
 func Test_Login_Success_Password_Complex(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "`-=[]\\;',./~!@#$%^&*)(_+}{|\":<>?`¡™£¢∞§¶•ª–≠‘“æ…÷≥”’")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "80464ae775ca97187d29bc4b3e391e959947138a", EmailVerified: true}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "80464ae775ca97187d29bc4b3e391e959947138a", EmailVerified: true}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1552,8 +1557,8 @@ func TestRefreshSession_StatusOK(t *testing.T) {
 	var tokenData TokenData
 	_ = json.Unmarshal(body, &tokenData)
 
-	if tokenData.UserId != USR.Id {
-		t.Fatalf("should have had a user id of `%v` but was %v", USR.Id, tokenData.UserId)
+	if tokenData.UserID != USR.ID {
+		t.Fatalf("should have had a user id of `%v` but was %v", USR.ID, tokenData.UserID)
 	}
 }
 
@@ -1614,7 +1619,7 @@ func Test_LongTermLogin_Error_FindUsersNil(t *testing.T) {
 
 func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1626,7 +1631,7 @@ func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 
 func Test_LongTermLogin_Error_PasswordMismatch(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "MISMATCH")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1638,7 +1643,7 @@ func Test_LongTermLogin_Error_PasswordMismatch(t *testing.T) {
 
 func Test_LongTermLogin_Error_EmailNotVerified(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1649,7 +1654,7 @@ func Test_LongTermLogin_Error_EmailNotVerified(t *testing.T) {
 
 func Test_LongTermLogin_Success(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{ID: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1732,8 +1737,8 @@ func TestServerCheckToken_StatusOK(t *testing.T) {
 
 	t.Log("token data returned ", tokenData)
 
-	if tokenData.UserId != "shoreline" {
-		t.Fatalf("should have had a server id of `shoreline` but was %v", tokenData.UserId)
+	if tokenData.UserID != "shoreline" {
+		t.Fatalf("should have had a server id of `shoreline` but was %v", tokenData.UserID)
 	}
 
 	if tokenData.IsServer != true {
@@ -1827,17 +1832,17 @@ func TestAnonymousIdHashPair_StatusOK(t *testing.T) {
 
 	body, _ := ioutil.ReadAll(response.Body)
 
-	var anonIdHashPair AnonIdHashPair
-	_ = json.Unmarshal(body, &anonIdHashPair)
+	var anonIDHashPair AnonIdHashPair
+	_ = json.Unmarshal(body, &anonIDHashPair)
 
-	if anonIdHashPair.Name != "" {
-		t.Fatalf("should have no name but was %v", anonIdHashPair.Name)
+	if anonIDHashPair.Name != "" {
+		t.Fatalf("should have no name but was %v", anonIDHashPair.Name)
 	}
-	if anonIdHashPair.Id == "" {
-		t.Fatalf("should have an Id but was %v", anonIdHashPair.Id)
+	if anonIDHashPair.Id == "" {
+		t.Fatalf("should have an ID but was %v", anonIDHashPair.Id)
 	}
-	if anonIdHashPair.Hash == "" {
-		t.Fatalf("should have an Hash but was %v", anonIdHashPair.Hash)
+	if anonIDHashPair.Hash == "" {
+		t.Fatalf("should have an Hash but was %v", anonIDHashPair.Hash)
 	}
 }
 
@@ -1862,17 +1867,17 @@ func TestAnonymousIdHashPair_StatusOK_EvenWhenNoURLParams(t *testing.T) {
 
 	body, _ := ioutil.ReadAll(response.Body)
 
-	var anonIdHashPair AnonIdHashPair
-	_ = json.Unmarshal(body, &anonIdHashPair)
+	var anonIDHashPair AnonIdHashPair
+	_ = json.Unmarshal(body, &anonIDHashPair)
 
-	if anonIdHashPair.Name != "" {
-		t.Fatalf("should have no name but was %v", anonIdHashPair.Name)
+	if anonIDHashPair.Name != "" {
+		t.Fatalf("should have no name but was %v", anonIDHashPair.Name)
 	}
-	if anonIdHashPair.Id == "" {
-		t.Fatalf("should have an Id but was %v", anonIdHashPair.Id)
+	if anonIDHashPair.Id == "" {
+		t.Fatalf("should have an ID but was %v", anonIDHashPair.Id)
 	}
-	if anonIdHashPair.Hash == "" {
-		t.Fatalf("should have an Hash but was %v", anonIdHashPair.Hash)
+	if anonIDHashPair.Hash == "" {
+		t.Fatalf("should have an Hash but was %v", anonIDHashPair.Hash)
 	}
 }
 
@@ -1965,7 +1970,7 @@ func Test_AuthenticateSessionToken_Expired(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Unexpected success")
 	}
-	if err.Error() != "Token is expired" {
+	if err.Error() != "token is expired by 1h0m0s" {
 		t.Fatalf("Unexpected error: %s", err.Error())
 	}
 	if tokenData != nil {
@@ -1984,8 +1989,8 @@ func Test_AuthenticateSessionToken_Success_User(t *testing.T) {
 	if tokenData == nil {
 		t.Fatalf("Missing expected token data")
 	}
-	if tokenData.UserId != "abcdef1234" {
-		t.Fatalf("Unexpected token user id: %s", tokenData.UserId)
+	if tokenData.UserID != "abcdef1234" {
+		t.Fatalf("Unexpected token user id: %s", tokenData.UserID)
 	}
 	if tokenData.IsServer {
 		t.Fatalf("Unexpected server token")
@@ -2006,8 +2011,8 @@ func Test_AuthenticateSessionToken_Success_Server(t *testing.T) {
 	if tokenData == nil {
 		t.Fatalf("Missing expected token data")
 	}
-	if tokenData.UserId != "abcdef1234" {
-		t.Fatalf("Unexpected token user id: %s", tokenData.UserId)
+	if tokenData.UserID != "abcdef1234" {
+		t.Fatalf("Unexpected token user id: %s", tokenData.UserID)
 	}
 	if !tokenData.IsServer {
 		t.Fatalf("Unexpected non-server token")
@@ -2020,7 +2025,7 @@ func Test_AuthenticateSessionToken_Success_Server(t *testing.T) {
 ////////////////////////////////////////////////////////////////////////////////
 
 func Test_TokenUserHasRequestedPermissions_Server(t *testing.T) {
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: true, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: true, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "1234567890", requestedPermissions)
 	if err != nil {
@@ -2032,7 +2037,7 @@ func Test_TokenUserHasRequestedPermissions_Server(t *testing.T) {
 }
 
 func Test_TokenUserHasRequestedPermissions_Owner(t *testing.T) {
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "abcdef1234", requestedPermissions)
 	if err != nil {
@@ -2047,7 +2052,7 @@ func Test_TokenUserHasRequestedPermissions_GatekeeperError(t *testing.T) {
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
 
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "1234567890", requestedPermissions)
 	if err == nil {
@@ -2065,7 +2070,7 @@ func Test_TokenUserHasRequestedPermissions_CompleteMismatch(t *testing.T) {
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"y": clients.Allowed, "z": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "1234567890", requestedPermissions)
 	if err != nil {
@@ -2080,7 +2085,7 @@ func Test_TokenUserHasRequestedPermissions_PartialMismatch(t *testing.T) {
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"a": clients.Allowed, "z": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "1234567890", requestedPermissions)
 	if err != nil {
@@ -2095,7 +2100,7 @@ func Test_TokenUserHasRequestedPermissions_FullMatch(t *testing.T) {
 	responsableGatekeeper.UserInGroupResponses = []PermissionsResponse{{clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
-	tokenData := &TokenData{UserId: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
+	tokenData := &TokenData{UserID: "abcdef1234", IsServer: false, DurationSecs: TOKEN_DURATION}
 	requestedPermissions := clients.Permissions{"a": clients.Allowed, "b": clients.Allowed}
 	permissions, err := responsableShoreline.tokenUserHasRequestedPermissions(tokenData, "1234567890", requestedPermissions)
 	if err != nil {
