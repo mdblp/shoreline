@@ -1,6 +1,6 @@
 #!/bin/sh -ex
 
-wget -q -O artifact_go.sh 'https://raw.githubusercontent.com/mdblp/tools/feature/review_security_scan/artifact/artifact_go.sh'
+wget -q -O artifact_go.sh 'https://raw.githubusercontent.com/mdblp/tools/feature/add_platform/artifact/artifact_go.sh'
 chmod +x artifact_go.sh
 
 . ./version.sh
