@@ -12,9 +12,14 @@ $GOPATH/bin/swag --version
 $GOPATH/bin/swag init --generalInfo shoreline.go --output docs
 
 # When tag is present, openapi doc is renamed before being deployed to S3
+# It is stored in a new directory that will be used as source by the Travis deploy step
 if [ -n "${TRAVIS_TAG:-}" ]; then
     APP="${TRAVIS_REPO_SLUG#*/}"
     APP_TAG="${APP}-${TRAVIS_TAG/dblp./}"
     mkdir docs/openapi
     mv docs/swagger.json docs/openapi/${APP_TAG}-swagger.json
-fi
+    # If this is not a release candidate but a "true" release, we consider this doc is the latest
+    # we create a copy named "latest" to be consumed by documentation website using SwaggerUI
+    if [[ ! ${TRAVIS_TAG} =~ rc[0-9] ]]; then
+      cp docs/openapi/${APP_TAG}-swagger.json docs/openapi/${APP}-latest-swagger.json
+    fi
