@@ -250,18 +250,15 @@ func main() {
 
 	logger.Print("listenting for signals")
 
-	signals := make(chan os.Signal, 40)
-	signal.Notify(signals)
+	// Wait for SIGINT (Ctrl+C) or SIGTERM to stop the service
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		for {
-			sig := <-signals
-			logger.Printf("Got signal [%s]", sig)
-
-			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-				storage.Close()
-				server.Close()
-				done <- true
-			}
+			<-sigc
+			storage.Close()
+			server.Close()
+			done <- true
 		}
 	}()
 
