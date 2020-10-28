@@ -1,6 +1,6 @@
 module github.com/mdblp/shoreline
 
-go 1.12
+go 1.14
 
 replace github.com/tidepool-org/shoreline => ./
 

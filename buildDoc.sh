@@ -23,3 +23,4 @@ if [ -n "${TRAVIS_TAG:-}" ]; then
     if [[ ! ${TRAVIS_TAG} =~ rc[0-9] ]]; then
       cp docs/openapi/${APP_TAG}-swagger.json docs/openapi/${APP}-latest-swagger.json
     fi
+fi
