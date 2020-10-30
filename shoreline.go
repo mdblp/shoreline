@@ -1,8 +1,8 @@
 // @title Shoreline API
-// @version 0.0.1
+// @version 1.1.2
 // @description The purpose of this API is to provide authentication for end users and other tidepool Services
 // @license.name BSD 2-Clause "Simplified" License
-// @host localhost
+// @host api.android-qa.your-loops.dev
 // @BasePath /auth
 // @accept json
 // @produce json
