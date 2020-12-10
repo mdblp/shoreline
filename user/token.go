@@ -4,9 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 )
 
 type (
@@ -24,7 +26,11 @@ type (
 	TokenData struct {
 		IsServer     bool   `json:"isserver"`
 		UserId       string `json:"userid"`
+		Email        string `json:"email"`
+		Name         string `json:"name"`
+		IsClinic     bool   `json:"isclinic"`
 		DurationSecs int64  `json:"-"`
+		Audience     string `json:"audience"`
 	}
 
 	TokenConfig struct {
@@ -67,9 +73,27 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	} else {
 		claims["svr"] = "no"
 	}
+	// Add claims specific to our 3rd party services
+	if strings.ToUpper(data.Audience) == "ZENDESK" {
+		if data.IsClinic {
+			claims["organization"] = "clinic"
+		} else {
+			claims["organization"] = "patient"
+		}
+		claims["aud"] = "zendesk"
+	}
 	claims["usr"] = data.UserId
+	if data.Name != "" {
+		claims["name"] = data.Name
+	}
+	if data.Email != "" {
+		claims["email"] = data.Email
+	}
+
 	claims["dur"] = data.DurationSecs
 	claims["exp"] = expiresAt
+	claims["iat"] = createdAt
+	claims["jti"] = uuid.New()
 
 	tokenString, err := token.SignedString([]byte(config.Secret))
 	if err != nil {
@@ -127,11 +151,15 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 		durationSecs = int64(claims["dur"].(float64))
 	}
 	userId := claims["usr"].(string)
+	email := claims["email"].(string)
+	name := claims["name"].(string)
 
 	return &TokenData{
 		IsServer:     isServer,
 		DurationSecs: durationSecs,
 		UserId:       userId,
+		Email:        email,
+		Name:         name,
 	}, nil
 }
 
