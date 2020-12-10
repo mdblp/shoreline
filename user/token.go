@@ -151,8 +151,15 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 		durationSecs = int64(claims["dur"].(float64))
 	}
 	userId := claims["usr"].(string)
-	email := claims["email"].(string)
-	name := claims["name"].(string)
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		email = ""
+	}
+	name, ok := claims["name"].(string)
+	if !ok {
+		name = email
+	}
 
 	return &TokenData{
 		IsServer:     isServer,

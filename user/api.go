@@ -1004,7 +1004,7 @@ func (a *Api) AnonymousIdHashPair(res http.ResponseWriter, req *http.Request) {
 // @Summary Generate a 3rd party JWT
 // @Description Generate a token to authenticate the user to a 3rd party service
 // @ID shoreline-user-api-getToken
-// @Param service path string true ""rd party service name"
+// @Param service path string true "3rd party service name"
 // @Security TidepoolAuth
 // @Success 200 {object} status.Status
 // @Failure 500 {object} status.Status "message returned:\"Error generating the token" "
