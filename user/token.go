@@ -76,9 +76,10 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	// Add claims specific to our 3rd party services
 	if strings.ToUpper(data.Audience) == "ZENDESK" {
 		if data.IsClinic {
-			claims["organization"] = "clinic"
+			claims["organization"] = "Psad"
 		} else {
-			claims["organization"] = "patient"
+			claims["organization"] = "Patient"
+			claims["tags"] = "patient"
 		}
 		claims["aud"] = "zendesk"
 	}
