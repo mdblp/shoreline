@@ -420,7 +420,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		tokenData := TokenData{DurationSecs: extractTokenDuration(req), UserID: newUser.ID, IsServer: false}
+		tokenData := TokenData{DurationSecs: extractTokenDuration(req), UserID: newUser.ID, IsServer: false, UserRoles: newUserDetails.Roles}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionToken(&tokenData, tokenConfig); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
@@ -766,7 +766,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)
 
 	} else {
-		tokenData := &TokenData{DurationSecs: extractTokenDuration(req), UserID: result.ID}
+		tokenData := &TokenData{DurationSecs: extractTokenDuration(req), UserID: result.ID, UserRoles: result.Roles}
 		tokenConfig := TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionToken(tokenData, tokenConfig); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)

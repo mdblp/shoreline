@@ -12,13 +12,14 @@ import (
 type (
 	// SessionToken to be stored in database
 	SessionToken struct {
-		ID        string `json:"-" bson:"_id"`
-		IsServer  bool   `json:"isServer" bson:"isServer"`
-		ServerID  string `json:"-" bson:"serverid,omitempty"`
-		UserID    string `json:"userid,omitempty" bson:"userid,omitempty"`
-		ExpiresAt int64  `json:"-" bson:"expiresAt"`
-		IssuedAt  int64  `json:"-" bson:"issuedAt"`
-		Extended  bool   `json:"-" bson:"extended"`
+		ID        string   `json:"-" bson:"_id"`
+		IsServer  bool     `json:"isServer" bson:"isServer"`
+		ServerID  string   `json:"-" bson:"serverid,omitempty"`
+		UserID    string   `json:"userid,omitempty" bson:"userid,omitempty"`
+		Roles     []string `json:"roles,omitempty" bson:"roles,omitempty"`
+		ExpiresAt int64    `json:"-" bson:"expiresAt"`
+		IssuedAt  int64    `json:"-" bson:"issuedAt"`
+		Extended  bool     `json:"-" bson:"extended"`
 	}
 
 	// TokenData what is sent in the JWT token
@@ -81,6 +82,7 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	claims := &tokenClaims{
 		UserID: data.UserID,
 	}
+
 	if data.IsServer {
 		claims.IsServer = "yes"
 	} else {
@@ -110,16 +112,9 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 		sessionToken.ServerID = data.UserID
 	} else {
 		sessionToken.UserID = data.UserID
+		sessionToken.Roles = data.UserRoles
 	}
 
-	return sessionToken, nil
-}
-
-func createSessionTokenAndSave(data *TokenData, config TokenConfig, store Storage) (*SessionToken, error) {
-	sessionToken, err := CreateSessionToken(data, config)
-	if err != nil {
-		return nil, err
-	}
 	return sessionToken, nil
 }
 

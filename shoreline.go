@@ -66,6 +66,8 @@ func main() {
 	// Init random number generator
 	rand.Seed(time.Now().UnixNano())
 
+	logger.Println("Starting shoreline")
+
 	// Set some default config values
 	config.User.MaxFailedLogin = 5
 	config.User.DelayBeforeNextLoginAttempt = 10 // 10 minutes
@@ -126,15 +128,10 @@ func main() {
 		config.User.ClinicDemoUserID = clinicDemoUserID
 	}
 	config.User.Marketo.ID, _ = os.LookupEnv("MARKETO_ID")
-
 	config.User.Marketo.URL, _ = os.LookupEnv("MARKETO_URL")
-
 	config.User.Marketo.Secret, _ = os.LookupEnv("MARKETO_SECRET")
-
 	config.User.Marketo.ClinicRole, _ = os.LookupEnv("MARKETO_CLINIC_ROLE")
-
 	config.User.Marketo.PatientRole, _ = os.LookupEnv("MARKETO_PATIENT_ROLE")
-
 	unParsedTimeout, found := os.LookupEnv("MARKETO_TIMEOUT")
 	if found {
 		parsedTimeout64, err := strconv.ParseInt(unParsedTimeout, 10, 32)
@@ -246,25 +243,19 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	hakkenClient.Publish(&config.Service)
+	// hakkenClient.Publish(&config.Service)
 
 	logger.Print("listenting for signals")
-
-	signals := make(chan os.Signal, 40)
-	signal.Notify(signals)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		for {
-			sig := <-signals
-			logger.Printf("Got signal [%s]", sig)
-
-			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-				storage.Close()
-				server.Close()
-				done <- true
-			}
+			<-sigc
+			storage.Close()
+			server.Close()
+			done <- true
 		}
 	}()
 
 	<-done
-
 }
