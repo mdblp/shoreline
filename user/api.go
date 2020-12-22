@@ -295,7 +295,7 @@ func (a *Api) SetHandlers(prefix string, rtr *mux.Router) {
 
 	rtr.Handle("/token/{token}", varsHandler(a.ServerCheckToken)).Methods("GET")
 
-	rtr.Handle("/sso/{service}", varsHandler(a.Get3rdPartyToken)).Methods("POST")
+	rtr.Handle("/ext-token/{service}", varsHandler(a.Get3rdPartyToken)).Methods("POST")
 
 	rtr.HandleFunc("/logout", a.Logout).Methods("POST")
 
@@ -1010,7 +1010,7 @@ func (a *Api) AnonymousIdHashPair(res http.ResponseWriter, req *http.Request) {
 // @Failure 500 {object} status.Status "message returned:\"Error generating the token" "
 // @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\" "
 // @Failure 400 {object} status.Status "message returned:\"Unknown query parameter\" or \"Error generating the token\" "
-// @Router /sso/{service} [post]
+// @Router /ext-token/{service} [post]
 func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 
 	secret := ""
@@ -1029,7 +1029,6 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 		return
 	}
 
-	// Should we also support authentication with login/pwd?
 	td, err := a.authenticateSessionToken(req.Header.Get(TP_SESSION_TOKEN))
 
 	if err != nil {
@@ -1039,10 +1038,9 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 	}
 	td.Audience = service
 	//refresh
-	if sessionToken, err := CreateSessionTokenAndSave(
+	if sessionToken, err := CreateSessionToken(
 		td,
 		TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: secret},
-		a.Store,
 	); err != nil {
 		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
