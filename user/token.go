@@ -30,6 +30,7 @@ type (
 		Email        string `json:"email"`
 		Name         string `json:"name"`
 		IsClinic     bool   `json:"isclinic"`
+		Role         string `json:"role"`
 		DurationSecs int64  `json:"-"`
 		Audience     string `json:"audience"`
 	}
@@ -83,6 +84,8 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 			claims["tags"] = "patient"
 		}
 		claims["aud"] = "zendesk"
+	} else {
+		claims["role"] = data.Role
 	}
 	claims["usr"] = data.UserId
 	if data.Name != "" {
@@ -162,6 +165,10 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if !ok {
 		name = email
 	}
+	role, ok := claims["role"].(string)
+	if !ok {
+		role = ""
+	}
 
 	return &TokenData{
 		IsServer:     isServer,
@@ -169,6 +176,7 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 		UserId:       userId,
 		Email:        email,
 		Name:         name,
+		Role:         role,
 	}, nil
 }
 
