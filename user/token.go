@@ -29,7 +29,6 @@ type (
 		UserId       string `json:"userid"`
 		Email        string `json:"email"`
 		Name         string `json:"name"`
-		IsClinic     bool   `json:"isclinic"`
 		Role         string `json:"role"`
 		DurationSecs int64  `json:"-"`
 		Audience     string `json:"audience"`
@@ -77,12 +76,15 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	}
 	// Add claims specific to our 3rd party services
 	if strings.ToUpper(data.Audience) == "ZENDESK" {
-		if data.IsClinic {
-			claims["organization"] = "Psad"
-		} else {
+		if data.Role == "patient" {
 			claims["organization"] = "Patient"
 			claims["tags"] = "patient"
 		}
+		if data.Role == "hcp" {
+			claims["organization"] = "Psad"
+			claims["tags"] = "Psad"
+		}
+		// what about caregivers?
 		claims["aud"] = "zendesk"
 	} else {
 		claims["role"] = data.Role
