@@ -180,7 +180,6 @@ type (
 		BlockParallelLogin bool `json:blockParallelLogin`
 		//allows for the skipping of verification for testing
 		VerificationSecret string           `json:"verificationSecret"`
-		ClinicDemoUserID   string           `json:"clinicDemoUserId"`
 		Mailchimp          mailchimp.Config `json:"mailchimp"`
 		// to create type/file
 		Marketo marketo.Config `json:"marketo"`

@@ -63,7 +63,6 @@ var (
 		DelayBeforeNextLoginAttempt: 10,
 		MaxConcurrentLogin:          100,
 		VerificationSecret:          "",
-		ClinicDemoUserID:            "00000000",
 		Marketo: marketo.Config{
 			ID:          "1234",
 			Secret:      "shhh! don't tell *3",
