@@ -122,10 +122,10 @@ func Test_GenerateSessionToken_Zendesk_Claims_Patient(t *testing.T) {
 	claims := jwtToken.Claims.(jwt.MapClaims)
 
 	// check zendesk claims
-	if claims["organization"] != "Patient" {
+	if claims["organization"] != "patient" {
 		t.Fatalf("the organization should have been set to 'Patient'")
 	}
-	if claims["tags"] != "Patient" {
+	if claims["tags"] != "patient" {
 		t.Fatalf("the tags should have been set to 'Patient'")
 	}
 	if claims["aud"] != "zendesk" {
@@ -133,7 +133,39 @@ func Test_GenerateSessionToken_Zendesk_Claims_Patient(t *testing.T) {
 	}
 }
 
-func Test_GenerateSessionToken_Zendesk_Claims_Psad(t *testing.T) {
+func Test_GenerateSessionToken_Zendesk_Claims_Caregiver(t *testing.T) {
+
+	testData := tokenTestData{
+		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Audience: "zendesk", Role: "caregiver"},
+		config: tokenConfig,
+	}
+
+	token, _ := CreateSessionToken(testData.data, testData.config)
+
+	if token.ID == "" || token.Time == 0 {
+		t.Fatalf("should generate a session token")
+	}
+
+	jwtToken, err := jwt.Parse(token.ID, func(t *jwt.Token) (interface{}, error) { return []byte(testData.config.Secret), nil })
+	if err != nil || !jwtToken.Valid {
+		t.Fatalf("should decode and validate the token")
+	}
+
+	claims := jwtToken.Claims.(jwt.MapClaims)
+
+	// check zendesk claims
+	if claims["organization"] != "patient" {
+		t.Fatalf("the organization should have been set to 'Patient'")
+	}
+	if claims["tags"] != "patient" {
+		t.Fatalf("the tags should have been set to 'Patient'")
+	}
+	if claims["aud"] != "zendesk" {
+		t.Fatalf("the audience should have been set to 'zendesk'")
+	}
+}
+
+func Test_GenerateSessionToken_Zendesk_Claims_Pro(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Audience: "zendesk", Role: "hcp"},
@@ -154,11 +186,11 @@ func Test_GenerateSessionToken_Zendesk_Claims_Psad(t *testing.T) {
 	claims := jwtToken.Claims.(jwt.MapClaims)
 
 	// check zendesk claims
-	if claims["organization"] != "Psad" {
-		t.Fatalf("the organization should have been set to 'Psad'")
+	if claims["organization"] != "professional" {
+		t.Fatalf("the organization should have been set to 'professional'")
 	}
-	if claims["tags"] != "Psad" {
-		t.Fatalf("the tags should have been set to 'Psad'")
+	if claims["tags"] != "professional" {
+		t.Fatalf("the tags should have been set to 'professional'")
 	}
 	if claims["aud"] != "zendesk" {
 		t.Fatalf("the audience should have been set to 'zendesk'")
