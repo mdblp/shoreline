@@ -148,14 +148,13 @@ func IsValidPassword(password string) bool {
 }
 
 func IsValidRole(role string) bool {
-	// With the current behaviour, patients are created without role
 	switch role {
 	case "caregiver":
 		return true
 	case "hcp":
 		return true
-	// case "patient":
-	// 	return true
+	case "patient":
+		return true
 	default:
 		return false
 	}

@@ -78,7 +78,7 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	if strings.ToUpper(data.Audience) == "ZENDESK" {
 		if data.Role == "patient" {
 			claims["organization"] = "Patient"
-			claims["tags"] = "patient"
+			claims["tags"] = "Patient"
 		}
 		if data.Role == "hcp" {
 			claims["organization"] = "Psad"
