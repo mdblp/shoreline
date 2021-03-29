@@ -23,7 +23,7 @@ type Config struct {
 
 type AuthService interface {
 	Authenticate(sessionToken string) (*token.TokenData, error)
-	AuthMiddleware() gin.HandlerFunc
+	AuthMiddleware(authorizeUnverified bool) gin.HandlerFunc
 }
 
 // Client holds the state of the Auth Client
