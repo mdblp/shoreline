@@ -2,7 +2,7 @@
 
 Shoreline is the module that manages logins and user accounts.
 
-## 1.3.2 2021-03-29
+## 1.3.2 - 2021-03-29
 ### Fixed
 - YLP-587 Auth clients should check the Shoreline token with email verified
 
