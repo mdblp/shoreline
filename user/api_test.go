@@ -660,6 +660,19 @@ func Test_UpdateUser_Error_UnauthorizedRoles_Patient(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
 }
 
+func Test_UpdateUser_Error_UnauthorizedRoles_Patient2(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"patient"}}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"roles\": [\"caregiver\"]}}"
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestBodyHeaders(t, "PUT", "/user/1111111111", body, headers)
+	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
+}
+
 func Test_UpdateUser_Error_UnauthorizedRoles_HCP(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
@@ -667,6 +680,19 @@ func Test_UpdateUser_Error_UnauthorizedRoles_HCP(t *testing.T) {
 	defer T_ExpectResponsablesEmpty(t)
 
 	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"roles\": [\"caregiver\"]}}"
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestBodyHeaders(t, "PUT", "/user/1111111111", body, headers)
+	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
+}
+
+func Test_UpdateUser_Error_UnauthorizedRoles_HCP2(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"hcp"}}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	body := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"a@z.co\"], \"roles\": [\"patient\"]}}"
 	headers := http.Header{}
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestBodyHeaders(t, "PUT", "/user/1111111111", body, headers)
