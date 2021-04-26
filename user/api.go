@@ -539,8 +539,20 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 					failedMarketoUploadCounter.Inc()
 				}
 			}
-			a.logAudit(req, tokenData, "UpdateUser isClinic{%t}", updatedUser.IsClinic())
-			a.sendUser(res, updatedUser, tokenData.IsServer)
+			// Generate new token after update done in db (could be factorize with create User func)
+			role := "patient"
+			if updatedUser.Roles != nil && len(updatedUser.Roles) > 0 {
+				role = updatedUser.Roles[0]
+			}
+			newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: updatedUser.Id, IsServer: tokenData.IsServer, Role: role}
+			tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
+			if sessionToken, err := CreateSessionTokenAndSave(req.Context(), &newTokenData, tokenConfig, a.Store); err != nil {
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
+			} else {
+				a.logAudit(req, &newTokenData, "UpdateUser isClinic{%t}", updatedUser.IsClinic())
+				res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
+				a.sendUserWithStatus(res, updatedUser, http.StatusOK, newTokenData.IsServer)
+			}
 		}
 	}
 }
