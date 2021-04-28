@@ -728,7 +728,6 @@ func Test_UpdateUser_Error_UnauthorizedEmailVerified_User(t *testing.T) {
 func Test_UpdateUser_Success_UserFromUrl(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -746,7 +745,6 @@ func Test_UpdateUser_Success_UserFromUrl(t *testing.T) {
 func Test_UpdateUser_Success_UserWithUnchangedUsername(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -763,7 +761,6 @@ func Test_UpdateUser_Success_UserWithUnchangedUsername(t *testing.T) {
 
 func Test_UpdateUser_Success_UserFromToken(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
@@ -782,7 +779,6 @@ func Test_UpdateUser_Success_UserFromToken(t *testing.T) {
 func Test_UpdateUser_Success_AuthorizedRoles_Caregiver(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"caregiver"}, TermsAccepted: "2016-01-01T01:23:45-08:00"}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -800,7 +796,6 @@ func Test_UpdateUser_Success_AuthorizedRoles_Caregiver(t *testing.T) {
 func Test_UpdateUser_Success_Server_WithoutPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"hcp"}}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -818,7 +813,6 @@ func Test_UpdateUser_Success_Server_WithoutPassword(t *testing.T) {
 func Test_UpdateUser_Success_Server_WithPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.AddTokenResponses = []error{nil}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"caregiver"}}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
