@@ -814,7 +814,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Failure 401 {string} string ""
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
-	a.logger.Printf("refresh session token %v", req)
+	a.logger.Printf("refresh session token %v and trace %v", req.Header.Get(TP_SESSION_TOKEN), req.Header.Get(TP_TRACE_SESSION))
 	td, err := a.authenticateSessionToken(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
 
 	if err != nil {
