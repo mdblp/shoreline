@@ -54,12 +54,14 @@ type NewCustodialUserDetails struct {
 }
 
 type UpdateUserDetails struct {
-	Username      *string
-	Emails        []string
-	Password      *string
-	Roles         []string
-	TermsAccepted *string
-	EmailVerified *bool
+	Username        *string
+	Emails          []string
+	CurrentPassword *string
+	Password        *string
+	Roles           []string
+	TermsAccepted   *string
+	EmailVerified   *bool
+	nFields         int
 }
 
 var (
@@ -368,13 +370,14 @@ func (details *UpdateUserDetails) ExtractFromJSON(reader io.Reader) error {
 	}
 
 	var (
-		username      *string
-		emails        []string
-		password      *string
-		roles         []string
-		termsAccepted *string
-		emailVerified *bool
-		ok            bool
+		username        *string
+		emails          []string
+		password        *string
+		currentPassword *string
+		roles           []string
+		termsAccepted   *string
+		emailVerified   *bool
+		ok              bool
 	)
 
 	decoded, ok = ExtractStringMap(decoded, "updates")
@@ -391,6 +394,9 @@ func (details *UpdateUserDetails) ExtractFromJSON(reader io.Reader) error {
 	if password, ok = ExtractString(decoded, "password"); !ok {
 		return User_error_password_invalid
 	}
+	if currentPassword, ok = ExtractString(decoded, "currentPassword"); !ok {
+		return User_error_password_invalid
+	}
 	if roles, ok = ExtractStringArray(decoded, "roles"); !ok {
 		return User_error_roles_invalid
 	}
@@ -404,6 +410,7 @@ func (details *UpdateUserDetails) ExtractFromJSON(reader io.Reader) error {
 	details.Username = username
 	details.Emails = emails
 	details.Password = password
+	details.CurrentPassword = currentPassword
 	details.Roles = roles
 	details.TermsAccepted = termsAccepted
 	details.EmailVerified = emailVerified
@@ -425,10 +432,12 @@ func (details *UpdateUserDetails) Validate() error {
 		}
 	}
 
-	if details.Password != nil {
-		if !IsValidPassword(*details.Password) {
-			return User_error_password_invalid
-		}
+	if details.Password != nil && !IsValidPassword(*details.Password) {
+		return User_error_password_invalid
+	}
+
+	if details.CurrentPassword != nil && !IsValidPassword(*details.CurrentPassword) {
+		return User_error_password_invalid
 	}
 
 	if details.Roles != nil {
@@ -452,9 +461,28 @@ func ParseUpdateUserDetails(reader io.Reader) (*UpdateUserDetails, error) {
 	details := &UpdateUserDetails{}
 	if err := details.ExtractFromJSON(reader); err != nil {
 		return nil, err
-	} else {
-		return details, nil
 	}
+
+	if details.EmailVerified != nil {
+		details.nFields += 1
+	}
+	if len(details.Emails) > 0 {
+		details.nFields += 1
+	}
+	if details.Password != nil {
+		details.nFields += 1
+	}
+	if len(details.Roles) > 0 {
+		details.nFields += 1
+	}
+	if details.TermsAccepted != nil {
+		details.nFields += 1
+	}
+	if details.Username != nil {
+		details.nFields += 1
+	}
+
+	return details, nil
 }
 
 func (u *User) IsDeleted() bool {
@@ -474,9 +502,12 @@ func (u *User) HasRole(role string) bool {
 	return false
 }
 
+// IsClinic returns true for hcp, caregiver or clinic user
+//
+// Deprecated use HasRole() instead
 func (u *User) IsClinic() bool {
 	for _, userRole := range u.Roles {
-		if userRole == "hcp" || userRole == "clinic" {
+		if userRole == "hcp" || userRole == "caregiver" || userRole == "clinic" {
 			return true
 		}
 	}
