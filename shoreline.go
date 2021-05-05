@@ -97,11 +97,6 @@ func main() {
 		config.User.TokenSecrets["default"] = userSecret
 	}
 
-	mailchimpAPIKey, found := os.LookupEnv("MAILCHIMP_APIKEY")
-	if found {
-		config.User.Mailchimp.APIKey = mailchimpAPIKey
-	}
-
 	longTermKey, found := os.LookupEnv("LONG_TERM_KEY")
 	if found {
 		config.User.LongTermKey = longTermKey
@@ -110,45 +105,6 @@ func main() {
 	verificationSecret, found := os.LookupEnv("VERIFICATION_SECRET")
 	if found {
 		config.User.VerificationSecret = verificationSecret
-	}
-
-	clinicLists, found := os.LookupEnv("CLINIC_LISTS")
-	if found {
-		if err := json.Unmarshal([]byte(clinicLists), &config.User.Mailchimp.ClinicLists); err != nil {
-			log.Panic("Problem loading clinic lists", err)
-		}
-	}
-
-	personalLists, found := os.LookupEnv("PERSONAL_LISTS")
-	if found {
-		if err := json.Unmarshal([]byte(personalLists), &config.User.Mailchimp.PersonalLists); err != nil {
-			log.Panic("Problem loading personal lists", err)
-		}
-	}
-
-	config.User.Marketo.ID, _ = os.LookupEnv("MARKETO_ID")
-
-	config.User.Marketo.URL, _ = os.LookupEnv("MARKETO_URL")
-
-	config.User.Marketo.Secret, _ = os.LookupEnv("MARKETO_SECRET")
-
-	config.User.Marketo.ClinicRole, _ = os.LookupEnv("MARKETO_CLINIC_ROLE")
-
-	config.User.Marketo.PatientRole, _ = os.LookupEnv("MARKETO_PATIENT_ROLE")
-
-	unParsedTimeout, found := os.LookupEnv("MARKETO_TIMEOUT")
-	if found {
-		parsedTimeout64, err := strconv.ParseInt(unParsedTimeout, 10, 32)
-		parsedTimeout := uint(parsedTimeout64)
-		if err != nil {
-			logger.Println(err)
-		}
-		config.User.Marketo.Timeout = parsedTimeout
-	}
-
-	mailChimpURL, found := os.LookupEnv("MAILCHIMP_URL")
-	if found {
-		config.User.Mailchimp.URL = mailChimpURL
 	}
 
 	salt, found := os.LookupEnv("SALT")
