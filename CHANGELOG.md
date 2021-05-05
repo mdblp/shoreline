@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages logins and user accounts.
 
+## 1.6.0 - 2021-05-03
+### Changed
+- YLP-: Remove mailchimp and marketo integration
+
 ## 1.5.1 - 2021-05-03
 ### Fixed
 - Correct client mock so it returns the correct role
