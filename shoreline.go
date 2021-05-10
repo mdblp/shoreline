@@ -18,34 +18,23 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
 
 	"github.com/mdblp/shoreline/user"
-	"github.com/mdblp/shoreline/user/marketo"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	common "github.com/tidepool-org/go-common"
 	"github.com/tidepool-org/go-common/clients"
 	"github.com/tidepool-org/go-common/clients/disc"
 	"github.com/tidepool-org/go-common/clients/hakken"
 	"github.com/tidepool-org/go-common/clients/mongo"
-)
-
-var (
-	failedMarketoKeyConfigurationCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "failedMarketoKeyConfigurationCounter",
-		Help: "The total number of failures to connect to marketo due to key configuration issues. Can not be resolved via retry",
-	})
 )
 
 type (
@@ -135,19 +124,6 @@ func main() {
 	/*
 	 * User-Api setup
 	 */
-
-	var marketoManager marketo.Manager
-	if err := config.User.Marketo.Validate(); err != nil {
-		logger.Println("WARNING: Marketo config is invalid", err)
-		failedMarketoKeyConfigurationCounter.Inc()
-	} else {
-		logger.Print("initializing marketo manager")
-		marketoManager, err = marketo.NewManager(logger, config.User.Marketo)
-		if err != nil {
-			logger.Println("WARNING: Marketo Manager not configured;", err)
-		}
-	}
-
 	storage, err := user.NewStore(&config.Mongo, logger)
 	if err != nil {
 		logger.Fatal(err)
@@ -155,7 +131,7 @@ func main() {
 	defer storage.Close()
 	storage.Start()
 
-	userapi := user.InitApi(config.User, logger, storage, auditLogger, marketoManager)
+	userapi := user.InitApi(config.User, logger, storage, auditLogger)
 	logger.Print("installing handlers")
 	userapi.SetHandlers("", rtr)
 
