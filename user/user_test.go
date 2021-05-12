@@ -799,7 +799,7 @@ func Test_UpdateUserDetails_ExtractFromJSON_InvalidPassword(t *testing.T) {
 	source := "{\"updates\": {\"username\": \"a@z.co\", \"emails\": [\"b@y.co\"], \"password\": true, \"roles\": [\"hcp\"], \"termsAccepted\": \"2016-01-01T12:00:00-08:00\", \"emailVerified\": true}}"
 	details := &UpdateUserDetails{}
 	err := details.ExtractFromJSON(strings.NewReader(source))
-	if err != User_error_password_invalid {
+	if err != User_error_new_password_invalid {
 		t.Fatalf("Unexpected error for invalid password: %#v", err)
 	}
 	if details.Username != nil || details.Emails != nil || details.Password != nil || details.Roles != nil || details.TermsAccepted != nil || details.EmailVerified != nil {
@@ -956,7 +956,7 @@ func Test_UpdateUserDetails_Validate_Password_Invalid(t *testing.T) {
 	password := "1234567"
 	details := &UpdateUserDetails{Password: &password}
 	err := details.Validate()
-	if err != User_error_password_invalid {
+	if err != User_error_new_password_invalid {
 		t.Fatalf("Unexpected error for password invalid: %#v", err)
 	}
 }
@@ -965,7 +965,7 @@ func Test_UpdateUserDetails_Validate_Password_Invalid_CurrentPassword(t *testing
 	currentPassword := "pwd"
 	details := &UpdateUserDetails{CurrentPassword: &currentPassword}
 	err := details.Validate()
-	if err != User_error_password_invalid {
+	if err != User_error_current_password_invalid {
 		t.Fatalf("Unexpected error for current password missing: %#v", err)
 	}
 }

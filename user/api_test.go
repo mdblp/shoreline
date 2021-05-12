@@ -770,7 +770,7 @@ func Test_UpdateUser_Error_Clinic_InvalidCurrentPassword(t *testing.T) {
 	headers := http.Header{}
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestBodyHeaders(t, "PUT", "/user", body, headers)
-	T_ExpectErrorResponse(t, response, http.StatusUnauthorized, "Not authorized for requested operation")
+	T_ExpectErrorResponse(t, response, http.StatusUnauthorized, "Wrong password")
 }
 
 func Test_UpdateUser_Success_Clinic_Password(t *testing.T) {

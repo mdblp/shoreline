@@ -472,7 +472,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				return
 			}
 			if !originalUser.PasswordsMatch(*updateUserDetails.CurrentPassword, a.ApiConfig.Salt) {
-				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
+				a.sendError(res, http.StatusUnauthorized, STATUS_PW_WRONG, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
 				return
 			}
 		}
@@ -843,7 +843,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// retrieve User in Db for having last information (role)
-	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId});
+	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
 	if errUser != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
