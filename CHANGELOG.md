@@ -2,9 +2,17 @@
 
 Shoreline is the module that manages logins and user accounts.
 
-## 1.6.0 - 2021-05-03
+## 1.6.1 - 2021-05-14
 ### Changed
 - YLP-: Remove mailchimp and marketo integration
+
+## 1.6.0 - 2021-05-12
+### Changed
+- YLP-713 Update password: hcp/caregivers must give current password
+
+## 1.5.2 - 2021-05-10
+### Fixed
+- YLP-702: tokens do not contain relevant role
 
 ## 1.5.1 - 2021-05-03
 ### Fixed
@@ -25,7 +33,6 @@ Shoreline is the module that manages logins and user accounts.
 - Move light (jwt) authentication client from crew
 - Move full shoreline client from go-common 
 - Travis to Jenkins pipeline
-
 
 ## 1.3.0
 ### Added

@@ -303,7 +303,6 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(s.Status.Code)
 		res.Write(jsonDetails)
 	}
-	return
 }
 
 // @Summary Get users
@@ -408,7 +407,8 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 // @Param user body user.UpdateUserDetails true "user update details"
 // @Security TidepoolAuth
 // @Success 200 {object} user.UpdateUserDetails
-// @Failure 500 {object} status.Status "message returned:\"Error updating user\" or \"Error finding user\" "
+// @Failure 304 {object} status.Status "message returned:\"Error updating user\" or \"Error finding user\" "
+// @Failure 500 {object} status.Status "message returned:\"Invalid user details were given\""
 // @Failure 409 {object} status.Status "message returned:\"User already exists\" "
 // @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\" "
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
@@ -425,6 +425,9 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 	} else if err := updateUserDetails.Validate(); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 
+	} else if updateUserDetails.nFields < 1 {
+		a.sendError(res, http.StatusNotModified, STATUS_INVALID_USER_DETAILS, "Empty payload")
+
 	} else if originalUser, err := a.Store.FindUser(req.Context(), &User{Id: firstStringNotEmpty(vars["userid"], tokenData.UserId)}); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
 
@@ -436,8 +439,24 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 
 	} else if updateUserDetails.EmailVerified != nil && !tokenData.IsServer {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User does not have permissions")
+
 	} else {
-		updatedUser := originalUser.DeepClone()
+
+		// TODO: This all needs to be refactored so it can be more thoroughly tested
+
+		if updateUserDetails.Password != nil && !tokenData.IsServer && (originalUser.HasRole("hcp") || originalUser.HasRole("caregiver")) {
+			// Caregiver & hcp: Must provide their current password to change it
+			// Patient password change is done differently
+			// Server token: Can perform the change
+			if updateUserDetails.CurrentPassword == nil {
+				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Missing current password")
+				return
+			}
+			if !originalUser.PasswordsMatch(*updateUserDetails.CurrentPassword, a.ApiConfig.Salt) {
+				a.sendError(res, http.StatusUnauthorized, STATUS_PW_WRONG, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
+				return
+			}
+		}
 
 		// Check role
 		if updateUserDetails.Roles != nil {
@@ -454,8 +473,8 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				return
 			}
 		}
-		// TODO: This all needs to be refactored so it can be more thoroughly tested
 
+		updatedUser := originalUser.DeepClone()
 		if updateUserDetails.Username != nil || updateUserDetails.Emails != nil {
 			dupCheck := &User{}
 			if updateUserDetails.Username != nil {
@@ -777,7 +796,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Failure 401 {string} string ""
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
-
+	a.logger.Printf("refresh session with trace token %v", req.Header.Get(TP_TRACE_SESSION))
 	td, err := a.authenticateSessionToken(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
 
 	if err != nil {
@@ -786,18 +805,35 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	//refresh
+	// retrieve User in Db for having last information (role)
+	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
+	if errUser != nil {
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+
+	} else if user == nil {
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
+	}
+
+	// Set Role
+	var role string
+	if user.Roles != nil && len(user.Roles) > 0 {
+		role = user.Roles[0]
+	}
+
+	//refresh token with update user information
+	newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: user.Id, IsServer: false, Role: role}
+	tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
 	if sessionToken, err := CreateSessionTokenAndSave(
 		req.Context(),
-		td,
-		token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
+		&newTokenData,
+		tokenConfig,
 		a.Store,
 	); err != nil {
 		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
 		return
 	} else {
-		a.logAudit(req, td, "RefreshSession")
+		a.logAudit(req, td, "Refresh session token with last user information")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 		sendModelAsRes(res, td)
 		return
