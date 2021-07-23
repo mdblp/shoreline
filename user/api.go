@@ -37,6 +37,12 @@ var (
 		Subsystem: "shoreline",
 		Namespace: "dblp",
 	}, []string{"error_type"})
+	inFligthLogin = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "in_flight_login_request",
+		Help: "the total number of concurrent login request",
+		Subsystem: "shoreline",
+		Namespace: "dblp",
+	})
 )
 
 type (
