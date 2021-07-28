@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/mdblp/shoreline/token"
 )
@@ -34,24 +38,55 @@ func getGivenDetail(req *http.Request) (d map[string]string) {
 	return d
 }
 
+// decodeLowerUTF16 is a workaround to accept login with non ascii characters
+//
+// Javascript & Java by default try to encode their base64 string using UTF-16
+// if the unicode code point value is less than 0xFF
+//
+// Try to decode the bytes as if each byte is an UTF-16 code point.
+func decodeLowerUTF16(b []byte) (string, error) {
+	var u16s []rune
+
+	for i, j := 0, len(b); i < j; i++ {
+		r := utf16.Decode([]uint16{uint16(b[i])})
+		if r[0] == unicode.ReplacementChar {
+			return "", errors.New("Invalid UTF-16 string")
+		}
+		u16s = append(u16s, r[0])
+	}
+	return string(u16s), nil
+}
+
 // Extract the username and password from the authorization
 // line of an HTTP header. This function will handle the
 // parsing and decoding of the line.
-func unpackAuth(authLine string) (usr *User, pw string) {
+func unpackAuth(authLine string) (*User, string, error) {
+	var err error
+	var decodedPayload []byte
+	var strPayload string
 	if authLine != "" {
 		parts := strings.SplitN(authLine, " ", 2)
 		payload := parts[1]
-		if decodedPayload, err := base64.StdEncoding.DecodeString(payload); err != nil {
-			log.Print(USER_API_PREFIX, "Error unpacking authorization header [%s]", err.Error())
+		if decodedPayload, err = base64.StdEncoding.DecodeString(payload); err != nil {
+			return nil, "", err
+		}
+		if utf8.Valid(decodedPayload) {
+			strPayload = string(decodedPayload)
 		} else {
-			details := strings.SplitN(string(decodedPayload), ":", 2)
-			if details[0] != "" || details[1] != "" {
-				//Note the incoming `name` could infact be id, email or the username
-				return &User{Id: details[0], Username: details[0], Emails: []string{details[0]}}, details[1]
+			log.Printf("%s authorization: Invalid UTF-8 decoded string, trying with lower UTF-16", USER_API_PREFIX)
+			strPayload, err = decodeLowerUTF16(decodedPayload)
+			if err != nil {
+				return nil, "", err
 			}
 		}
+
+		details := strings.SplitN(strPayload, ":", 2)
+		if details[0] != "" || details[1] != "" {
+			//Note the incoming `name` could infact be id, email or the username
+			return &User{Id: details[0], Username: details[0], Emails: []string{details[0]}}, details[1], nil
+		}
 	}
-	return nil, ""
+	return nil, "", errors.New("Empty authorization line")
 }
 
 func sendModelAsRes(res http.ResponseWriter, model interface{}) {
