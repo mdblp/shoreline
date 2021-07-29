@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/mdblp/shoreline/token"
@@ -38,23 +36,19 @@ func getGivenDetail(req *http.Request) (d map[string]string) {
 	return d
 }
 
-// decodeLowerUTF16 is a workaround to accept login with non ascii characters
+// fromISO8859 is a workaround to accept login with non ascii characters
 //
-// Javascript & Java by default try to encode their base64 string using UTF-16
-// if the unicode code point value is less than 0xFF
+// Javascript & Java by default try to encode their base64 string using
+// UTF-16 or ISO-8859-1 if the Unicode code point value is less than 0xFF
+// ISO-8859-1 as the same codepoints than Unicode for 0x00 - 0xFF range
 //
-// Try to decode the bytes as if each byte is an UTF-16 code point.
-func decodeLowerUTF16(b []byte) (string, error) {
-	var u16s []rune
-
+// Try to decode the bytes as if each byte is an Unicode code point.
+func fromISO8859(b []byte) string {
+	var u16s []rune = make([]rune, len(b))
 	for i, j := 0, len(b); i < j; i++ {
-		r := utf16.Decode([]uint16{uint16(b[i])})
-		if r[0] == unicode.ReplacementChar {
-			return "", errors.New("Invalid UTF-16 string")
-		}
-		u16s = append(u16s, r[0])
+		u16s[i] = rune(b[i])
 	}
-	return string(u16s), nil
+	return string(u16s)
 }
 
 // Extract the username and password from the authorization
@@ -73,11 +67,8 @@ func unpackAuth(authLine string) (*User, string, error) {
 		if utf8.Valid(decodedPayload) {
 			strPayload = string(decodedPayload)
 		} else {
-			log.Printf("%s authorization: Invalid UTF-8 decoded string, trying with lower UTF-16", USER_API_PREFIX)
-			strPayload, err = decodeLowerUTF16(decodedPayload)
-			if err != nil {
-				return nil, "", err
-			}
+			log.Printf("%s authorization: Invalid UTF-8 decoded string, trying with ISO-8859-1", USER_API_PREFIX)
+			strPayload = fromISO8859(decodedPayload)
 		}
 
 		details := strings.SplitN(strPayload, ":", 2)
