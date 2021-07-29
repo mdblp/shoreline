@@ -54,8 +54,10 @@ func fromISO8859(b []byte) string {
 // Extract the username and password from the authorization
 // line of an HTTP header. This function will handle the
 // parsing and decoding of the line.
-func unpackAuth(authLine string) (*User, string, error) {
-	var err error
+//
+// Return the user to pass to the mongo find function, the password
+// and an error or nil of there is no error
+func unpackAuth(authLine string) (user *User, passwd string, err error) {
 	var decodedPayload []byte
 	var strPayload string
 	if authLine != "" {
