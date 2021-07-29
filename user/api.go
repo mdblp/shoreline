@@ -653,7 +653,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, err)
 		return
 	}
-	if user == nil || password == "" {
+	if user == nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
 		return
 	}
