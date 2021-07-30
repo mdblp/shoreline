@@ -36,11 +36,11 @@ func getGivenDetail(req *http.Request) (d map[string]string) {
 	return d
 }
 
-// fromISO8859 is a workaround to accept login with non ascii characters
+// fromISO8859 is a workaround to accept strings not encoded in UT8 and containing non ascii characters
 //
 // Javascript & Java by default try to encode their base64 string using
 // UTF-16 or ISO-8859-1 if the Unicode code point value is less than 0xFF
-// ISO-8859-1 as the same codepoints than Unicode for 0x00 - 0xFF range
+// ISO-8859-1 has the same codepoints than Unicode for 0x00 - 0xFF range
 //
 // Try to decode the bytes as if each byte is an Unicode code point.
 func fromISO8859(b []byte) string {
@@ -56,7 +56,7 @@ func fromISO8859(b []byte) string {
 // parsing and decoding of the line.
 //
 // Return the user to pass to the mongo find function, the password
-// and an error or nil of there is no error
+// and an error or nil if there is no error
 func unpackAuth(authLine string) (user *User, passwd string, err error) {
 	var decodedPayload []byte
 	var strPayload string
