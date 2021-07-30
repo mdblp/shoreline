@@ -5,10 +5,11 @@ Shoreline is the module that manages logins and user accounts.
 ## UNRELEASED
 ### Changed
 - YLP-911: put in place metrics in shoreline
+- YLP-919 Yourloops do not encode correctly passwords with special characters
 
 ## 1.6.1 - 2021-05-14
 ### Changed
-- YLP-: Remove mailchimp and marketo integration
+- YLP-586: Remove mailchimp and marketo integration
 
 ## 1.6.0 - 2021-05-12
 ### Changed
