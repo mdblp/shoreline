@@ -267,7 +267,7 @@ func Test_extractTokenDuration(t *testing.T) {
 
 func Test_hasServerToken(t *testing.T) {
 	tokenTestData := &token.TokenData{UserId: "2341", IsServer: true, DurationSecs: 1}
-	tokenTestConfig := token.TokenConfig{DurationSecs: 3600, Secret: "my secret"}
+	tokenTestConfig := &token.TokenConfig{DurationSecs: 3600, Secret: "my secret"}
 
 	token, _ := token.CreateSessionToken(tokenTestData, tokenTestConfig)
 
@@ -278,7 +278,7 @@ func Test_hasServerToken(t *testing.T) {
 
 func Test_hasServerToken_false(t *testing.T) {
 	tokenTestData := &token.TokenData{UserId: "2341", IsServer: false, DurationSecs: 1}
-	tokenTestConfig := token.TokenConfig{DurationSecs: 3600, Secret: "my secret"}
+	tokenTestConfig := &token.TokenConfig{DurationSecs: 3600, Secret: "my secret"}
 
 	token, _ := token.CreateSessionToken(tokenTestData, tokenTestConfig)
 

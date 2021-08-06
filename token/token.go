@@ -2,6 +2,7 @@ package token
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -24,11 +25,13 @@ type (
 	TokenData struct {
 		IsServer     bool   `json:"isserver"`
 		UserId       string `json:"userid"`
-		Email        string `json:"email"`
-		Name         string `json:"name"`
-		Role         string `json:"role"`
-		DurationSecs int64  `json:"-"`
-		Audience     string `json:"audience"`
+		Email        string `json:"email,omitempty"`
+		Name         string `json:"name,omitempty"`
+		Role         string `json:"role,omitempty"`
+		DurationSecs int64  `json:"duration"`
+		ExpiresAt    int64  `json:"-"`
+		Audience     string `json:"audience,omitempty"`
+		JwtID        string `json:"-"`
 	}
 
 	TokenConfig struct {
@@ -45,14 +48,18 @@ const (
 )
 
 var (
-	SessionToken_error_no_userid        = errors.New("SessionToken: userId not set")
-	SessionToken_invalid                = errors.New("SessionToken: is invalid")
-	SessionToken_error_duration_not_set = errors.New("SessionToken: duration not set")
+	errorSessionTokenNoUserID         = errors.New("SessionToken: userId not set")
+	errorSessionTokenEmpty            = errors.New("SessionToken: empty token")
+	errorSessionTokenInvalid          = errors.New("SessionToken: is invalid")
+	errorSessionTokenNoDuration       = errors.New("SessionToken: dur not set")
+	errorSessionTokenExpirationNotSet = errors.New("SessionToken: exp not set")
+	errorSessionTokenUsrNotSet        = errors.New("SessionToken: exp not set")
 )
 
+// UnpackSessionTokenAndVerify verify that the provided token string is valid
 func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if id == "" {
-		return nil, SessionToken_error_no_userid
+		return nil, errorSessionTokenEmpty
 	}
 
 	jwtToken, err := jwt.Parse(id, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil })
@@ -60,16 +67,36 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 		return nil, err
 	}
 	if !jwtToken.Valid {
-		return nil, SessionToken_invalid
+		return nil, errorSessionTokenInvalid
 	}
 
 	claims := jwtToken.Claims.(jwt.MapClaims)
 	isServer := claims["svr"] == "yes"
 	durationSecs, ok := claims["dur"].(int64)
 	if !ok {
-		durationSecs = int64(claims["dur"].(float64))
+		dur64, ok := claims["dur"].(float64)
+		if !ok {
+			return nil, errorSessionTokenNoDuration
+		}
+		durationSecs = int64(dur64)
 	}
-	userId := claims["usr"].(string)
+
+	expiresAt, ok := claims["exp"].(int64)
+	if !ok {
+		var expiresAtFloat float64
+		expiresAtFloat, ok = claims["exp"].(float64)
+		if ok {
+			expiresAt = int64(expiresAtFloat)
+		}
+	}
+	if !ok || expiresAt <= 0 {
+		return nil, errorSessionTokenExpirationNotSet
+	}
+
+	userID, ok := claims["usr"].(string)
+	if !ok {
+		return nil, errorSessionTokenUsrNotSet
+	}
 
 	email, ok := claims["email"].(string)
 	if !ok {
@@ -83,28 +110,30 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	if !ok {
 		role = ""
 	}
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		return nil, errors.New("Missing jti")
+	}
 
 	return &TokenData{
 		IsServer:     isServer,
 		DurationSecs: durationSecs,
-		UserId:       userId,
+		ExpiresAt:    expiresAt,
+		UserId:       userID,
 		Email:        email,
 		Name:         name,
 		Role:         role,
+		JwtID:        jti,
 	}, nil
 }
 
-func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, error) {
+func CreateSessionToken(data *TokenData, config *TokenConfig) (*SessionToken, error) {
 	if data.UserId == "" {
-		return nil, SessionToken_error_no_userid
+		return nil, errorSessionTokenNoUserID
 	}
 
 	if data.DurationSecs == 0 {
-		if data.IsServer {
-			data.DurationSecs = 24 * 60 * 60
-		} else {
-			data.DurationSecs = config.DurationSecs
-		}
+		data.DurationSecs = config.DurationSecs
 	}
 
 	now := time.Now()
@@ -166,4 +195,15 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	}
 
 	return sessionToken, nil
+}
+
+// ToStringForLog return a string intended to be put in the logs only
+func (tokenData *TokenData) ToStringForLog() string {
+	var tokenType string
+	if tokenData.IsServer {
+		tokenType = "srv"
+	} else {
+		tokenType = "usr"
+	}
+	return fmt.Sprintf("%s{%s}, jti{%s}, dur{%d}, exp{%v}", tokenType, tokenData.UserId, tokenData.JwtID, tokenData.DurationSecs, tokenData.ExpiresAt)
 }

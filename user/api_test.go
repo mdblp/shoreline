@@ -61,10 +61,16 @@ var (
 	/*
 	 * users and tokens
 	 */
-	TOKEN_CONFIG  = token.TokenConfig{DurationSecs: FAKE_CONFIG.TokenDurationSecs, Secret: FAKE_CONFIG.Secret}
-	USR           = &User{Id: "123-99-100", Username: "test@new.bar", Emails: []string{"test@new.bar"}}
-	USR_TOKEN, _  = token.CreateSessionToken(&token.TokenData{UserId: USR.Id, IsServer: false, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
-	SRVR_TOKEN, _ = token.CreateSessionToken(&token.TokenData{UserId: "shoreline", IsServer: true, DurationSecs: TOKEN_DURATION}, TOKEN_CONFIG)
+	TOKEN_CONFIG  = &token.TokenConfig{DurationSecs: FAKE_CONFIG.TokenDurationSecs, Secret: FAKE_CONFIG.Secret}
+	USR           = InitPatientUser()
+	USR_PASSWORD  = "the-password"
+	USR_TOKEN, _  = token.CreateSessionToken(&token.TokenData{UserId: USR.Id, IsServer: false}, TOKEN_CONFIG)
+	SRVR_TOKEN, _ = token.CreateSessionToken(&token.TokenData{UserId: "shoreline", IsServer: true}, TOKEN_CONFIG)
+
+	invalidTokenConfig    = &token.TokenConfig{DurationSecs: FAKE_CONFIG.TokenDurationSecs, Secret: "Another secret"}
+	invalidUserToken, _   = token.CreateSessionToken(&token.TokenData{UserId: USR.Id, Role: "hcp", IsServer: false}, invalidTokenConfig)
+	invalidServerToken, _ = token.CreateSessionToken(&token.TokenData{UserId: "invalid-srv", IsServer: true}, invalidTokenConfig)
+
 	/*
 	 * basics setup
 	 */
@@ -76,11 +82,6 @@ var (
 	mockStore = NewMockStoreClient(FAKE_CONFIG.Salt, false, false)
 	shoreline = InitAPITest(FAKE_CONFIG, logger, mockStore)
 	/*
-	 *
-	 */
-	mockNoDupsStore = NewMockStoreClient(FAKE_CONFIG.Salt, true, false)
-	shorelineNoDups = InitAPITest(FAKE_CONFIG, logger, mockNoDupsStore)
-	/*
 	 * failure path
 	 */
 	mockStoreFails = NewMockStoreClient(FAKE_CONFIG.Salt, false, MAKE_IT_FAIL)
@@ -89,6 +90,17 @@ var (
 	responsableStore     = NewResponsableMockStoreClient()
 	responsableShoreline = InitShoreline(FAKE_CONFIG, responsableStore)
 )
+
+func InitPatientUser() *User {
+	user := &User{
+		Id:       "123-99-100",
+		Username: "test@new.bar",
+		Emails:   []string{"test@new.bar"},
+		Roles:    []string{"patient"},
+	}
+	user.HashPassword(USR_PASSWORD, FAKE_CONFIG.Salt)
+	return user
+}
 
 func InitShoreline(config *ApiConfig, store Storage) *Api {
 	config.TokenSecrets["zendesk"] = "zendeskSecret"
@@ -330,10 +342,12 @@ func Test_GetUsers_Error_MissingSessionToken(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 401, "Not authorized for requested operation")
 }
 
-func Test_GetUsers_Error_TokenError(t *testing.T) {
-	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{nil, errors.New("ERROR")}}
+func Test_GetUsers_Error_TokenErrorExpired(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, 1)
 	defer T_ExpectResponsablesEmpty(t)
+
+	// Wait 2s the token expires
+	time.Sleep(time.Duration(2) * time.Second)
 
 	headers := http.Header{}
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
@@ -354,7 +368,6 @@ func Test_GetUsers_Error_NotServerToken(t *testing.T) {
 
 func Test_GetUsers_Error_InvalidRole(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -365,7 +378,6 @@ func Test_GetUsers_Error_InvalidRole(t *testing.T) {
 
 func Test_GetUsers_Error_NoQuery(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -376,7 +388,6 @@ func Test_GetUsers_Error_NoQuery(t *testing.T) {
 
 func Test_GetUsers_Error_InvalidQuery(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -387,7 +398,6 @@ func Test_GetUsers_Error_InvalidQuery(t *testing.T) {
 
 func Test_GetUsers_Error_FindUsersWithIdsError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUsersWithIdsResponses = []FindUsersWithIdsResponse{{[]*User{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -441,7 +451,6 @@ func Test_GetUsers_Error_FindUsersWithIdsSuccess(t *testing.T) {
 
 func Test_GetUsers_Error_FindUsersByRoleError(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{}, errors.New("ERROR")}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -453,7 +462,6 @@ func Test_GetUsers_Error_FindUsersByRoleError(t *testing.T) {
 
 func Test_GetUsers_Error_FindUsersByRoleSuccess(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUsersByRoleResponses = []FindUsersByRoleResponse{{[]*User{{Id: "0000000000"}, {Id: "1111111111"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -841,7 +849,6 @@ func Test_UpdateUser_Success_AuthorizedRoles_Caregiver(t *testing.T) {
 
 func Test_UpdateUser_Success_Server_WithoutPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUserResponses = []FindUserResponse{{&User{Id: "1111111111", Roles: []string{"hcp"}}, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -860,7 +867,6 @@ func Test_UpdateUser_Success_Server_WithPassword(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
 	user := &User{Id: "1111111111", Roles: []string{"caregiver"}}
 	user.HashPassword("password", FAKE_CONFIG.Salt)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	responsableStore.FindUserResponses = []FindUserResponse{{user, nil}}
 	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
@@ -921,7 +927,7 @@ func Test_GetUserInfo_Error_FindUsersNil(t *testing.T) {
 func Test_GetUserInfo_Error_NoPermissions(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -933,7 +939,7 @@ func Test_GetUserInfo_Error_NoPermissions(t *testing.T) {
 func Test_GetUserInfo_Success_User(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "1111111111", false, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -946,8 +952,7 @@ func Test_GetUserInfo_Success_User(t *testing.T) {
 
 func Test_GetUserInfo_Success_Server(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "0000000000", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", EmailVerified: true, PwHash: "xyz", Hash: "123"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -960,90 +965,262 @@ func Test_GetUserInfo_Success_Server(t *testing.T) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func TestDeleteUser_StatusForbidden_WhenNoPw(t *testing.T) {
+func TestDeleteUser_StatusUnauthorized_WhenNoToken(t *testing.T) {
+	request, _ := http.NewRequest("DELETE", "/", nil)
+	response := httptest.NewRecorder()
+
+	shoreline.SetHandlers("", rtr)
+	shoreline.DeleteUser(response, request, NO_PARAMS)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusUnauthorized_InvalidToken(t *testing.T) {
+	request, _ := http.NewRequest("DELETE", "/", nil)
+	request.Header.Set(TP_SESSION_TOKEN, invalidUserToken.ID)
+	response := httptest.NewRecorder()
+
+	shoreline.SetHandlers("", rtr)
+	shoreline.DeleteUser(response, request, NO_PARAMS)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusUnauthorized_WhenNoUserIdInQuery(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
 	request, _ := http.NewRequest("DELETE", "/", nil)
 	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
 	response := httptest.NewRecorder()
 
-	shoreline.SetHandlers("", rtr)
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, NO_PARAMS)
 
-	shoreline.DeleteUser(response, request, NO_PARAMS)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
+	}
+}
 
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusForbidden, response.Code)
+func TestDeleteUser_StatusUnauthorized_WhenAnotherUserIdInQuery(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	request, _ := http.NewRequest("DELETE", "/", nil)
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": "invalid-userid"})
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusForbidden_WhenNoBody(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte{}
+	request, _ := http.NewRequest("DELETE", "/user/"+USR_TOKEN.UserID, bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
 
-	if string(body) != `{"code":403,"reason":"Missing id and/or password"}` {
+	expected := fmt.Sprintf(`{"code":%d,"reason":"%s"}`, http.StatusBadRequest, STATUS_MISSING_ID_PW)
+	if string(body) != expected {
+		t.Fatalf("Message given [%s] expected [%s] ", string(body), expected)
+	}
+}
+
+func TestDeleteUser_StatusForbidden_WhenInvalidBody(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(`{An invalid JSON]`)
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
+	}
+
+	body, _ := ioutil.ReadAll(response.Body)
+
+	if string(body) != `{"code":400,"reason":"Missing id and/or password"}` {
+		t.Fatalf("Message given [%s] expected [%s] ", string(body), STATUS_MISSING_ID_PW)
+	}
+}
+
+func TestDeleteUser_StatusForbidden_WhenNoPw(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(`{"pwd": 123}`)
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
+	}
+
+	body, _ := ioutil.ReadAll(response.Body)
+
+	if string(body) != `{"code":400,"reason":"Missing id and/or password"}` {
 		t.Fatalf("Message given [%s] expected [%s] ", string(body), STATUS_MISSING_ID_PW)
 	}
 }
 
 func TestDeleteUser_StatusForbidden_WhenEmptyPw(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	defer T_ExpectResponsablesEmpty(t)
 
 	var jsonData = []byte(`{"password": ""}`)
 	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
 	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
 	response := httptest.NewRecorder()
 
-	shoreline.SetHandlers("", rtr)
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
 
-	shoreline.DeleteUser(response, request, NO_PARAMS)
-
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusForbidden, response.Code)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
 
-	if string(body) != `{"code":403,"reason":"Missing id and/or password"}` {
+	if string(body) != `{"code":400,"reason":"Missing id and/or password"}` {
 		t.Fatalf("Message given [%s] expected [%s] ", string(body), STATUS_MISSING_ID_PW)
 	}
 }
 
-func TestDeleteUser_Failure(t *testing.T) {
-
-	var jsonData = []byte(`{"password": "92ggh38"}`)
-	req, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
-	req.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
-	resp := httptest.NewRecorder()
-
-	shorelineFails.SetHandlers("", rtr)
-
-	shorelineFails.DeleteUser(resp, req, NO_PARAMS)
-
-	if resp.Code != http.StatusUnauthorized {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, resp.Code)
-	}
-}
-
-func TestDeleteUser_StatusAccepted(t *testing.T) {
+func TestDeleteUser_StatusNotFound_WhenUserNotFound(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{nil, nil}}
+	defer T_ExpectResponsablesEmpty(t)
 
 	var jsonData = []byte(`{"password": "123youknoWm3"}`)
 	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
 	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
 	response := httptest.NewRecorder()
 
-	shoreline.SetHandlers("", rtr)
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
 
-	shoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
-
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusAccepted, response.Code)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusNotFound, response.Code)
 	}
 }
 
-func TestDeleteUser_StatusUnauthorized_WhenNoToken(t *testing.T) {
-	request, _ := http.NewRequest("DELETE", "/", nil)
+func TestDeleteUser_StatusNotFound_FindUserError(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{nil, errors.New("store find user random error")}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(`{"password": "123youknoWm3"}`)
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
 	response := httptest.NewRecorder()
 
-	shoreline.SetHandlers("", rtr)
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
 
-	shoreline.DeleteUser(response, request, NO_PARAMS)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusNotFound, response.Code)
+	}
+}
 
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusUnauthorized, response.Code)
+func TestDeleteUser_StatusForbidden_PasswdNoMatch(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{USR, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(`{"password": "123youknoWm3"}`)
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusForbidden, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusInternalServerError_ErrDeleteUser(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{USR, nil}}
+	responsableStore.RemoveUserResponses = []error{errors.New("DB error remove user")}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(fmt.Sprintf(`{"password": "%s"}`, USR_PASSWORD))
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusInternalServerError, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusAccepted_UserToken(t *testing.T) {
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{USR, nil}}
+	responsableStore.RemoveUserResponses = []error{nil}
+	responsableStore.RemoveTokenByIDResponses = []error{errors.New("Ignored DB error while delete token")}
+	defer T_ExpectResponsablesEmpty(t)
+
+	var jsonData = []byte(fmt.Sprintf(`{"password": "%s"}`, USR_PASSWORD))
+	request, _ := http.NewRequest("DELETE", "/", bytes.NewBuffer(jsonData))
+	request.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusAccepted, response.Code)
+	}
+}
+
+func TestDeleteUser_StatusAccepted_ServerToken(t *testing.T) {
+	responsableStore.RemoveUserResponses = []error{nil}
+	defer T_ExpectResponsablesEmpty(t)
+
+	request, _ := http.NewRequest("DELETE", "/", nil)
+	request.Header.Set(TP_SESSION_TOKEN, SRVR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.DeleteUser(response, request, map[string]string{"userid": USR.Id})
+
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusAccepted, response.Code)
 	}
 }
 
@@ -1215,7 +1392,7 @@ func TestServerLogin_StatusBadRequest_WhenNoNameOrSecret(t *testing.T) {
 	shoreline.ServerLogin(response, request)
 
 	if response.Code != http.StatusBadRequest {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusBadRequest, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
@@ -1235,7 +1412,7 @@ func TestServerLogin_StatusBadRequest_WhenNoName(t *testing.T) {
 	shoreline.ServerLogin(response, request)
 
 	if response.Code != http.StatusBadRequest {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusBadRequest, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
@@ -1255,7 +1432,7 @@ func TestServerLogin_StatusBadRequest_WhenNoSecret(t *testing.T) {
 	shoreline.ServerLogin(response, request)
 
 	if response.Code != http.StatusBadRequest {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusBadRequest, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
@@ -1276,27 +1453,11 @@ func TestServerLogin_StatusOK(t *testing.T) {
 	shoreline.ServerLogin(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	if response.Header().Get(TP_SESSION_TOKEN) == "" {
 		t.Fatal("The session token should have been set")
-	}
-
-}
-
-func TestServerLogin_Failure(t *testing.T) {
-	req, _ := http.NewRequest("POST", "/", nil)
-	req.Header.Set(TP_SERVER_NAME, "shoreline")
-	req.Header.Set(TP_SERVER_SECRET, THE_SECRET)
-	resp := httptest.NewRecorder()
-
-	shorelineFails.SetHandlers("", rtr)
-
-	shorelineFails.ServerLogin(resp, req)
-
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("Expected [%v] and got [%v]", http.StatusInternalServerError, resp.Code)
 	}
 }
 
@@ -1307,11 +1468,10 @@ func TestServerLogin_StatusUnauthorized_WhenSecretWrong(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	shoreline.SetHandlers("", rtr)
-
 	shoreline.ServerLogin(response, request)
 
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusUnauthorized, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
 	}
 
 	body, _ := ioutil.ReadAll(response.Body)
@@ -1332,7 +1492,7 @@ func TestRefreshSession_StatusUnauthorized_WithNoToken(t *testing.T) {
 	shoreline.RefreshSession(response, request)
 
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusUnauthorized, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
 	}
 }
 
@@ -1342,26 +1502,28 @@ func TestRefreshSession_StatusUnauthorized_WithWrongToken(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	shoreline.SetHandlers("", rtr)
-
 	shoreline.RefreshSession(response, request)
 
 	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusUnauthorized, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusUnauthorized, response.Code)
 	}
 }
 
 func TestRefreshSession_StatusOK(t *testing.T) {
-
-	shoreline.SetHandlers("", rtr)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{USR_TOKEN, nil}}
+	responsableStore.FindUserResponses = []FindUserResponse{{USR, nil}}
+	responsableStore.AddTokenResponses = []error{nil}
+	defer T_ExpectResponsablesEmpty(t)
 
 	refreshRequest, _ := http.NewRequest("GET", "/", nil)
 	refreshRequest.Header.Set(TP_SESSION_TOKEN, USR_TOKEN.ID)
 	response := httptest.NewRecorder()
 
-	shoreline.RefreshSession(response, refreshRequest)
+	responsableShoreline.SetHandlers("", rtr)
+	responsableShoreline.RefreshSession(response, refreshRequest)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	tokenString := response.Header().Get(TP_SESSION_TOKEN)
@@ -1456,7 +1618,7 @@ func Test_LongTermLogin_Error_FindUsersNil(t *testing.T) {
 
 func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1468,7 +1630,7 @@ func Test_LongTermLogin_Error_NoPassword(t *testing.T) {
 
 func Test_LongTermLogin_Error_PasswordMismatch(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "MISMATCH")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	responsableStore.UpsertUserResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1480,7 +1642,7 @@ func Test_LongTermLogin_Error_PasswordMismatch(t *testing.T) {
 
 func Test_LongTermLogin_Error_EmailNotVerified(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5"}}, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	headers := http.Header{}
@@ -1491,7 +1653,7 @@ func Test_LongTermLogin_Error_EmailNotVerified(t *testing.T) {
 
 func Test_LongTermLogin_Error_ErrorCreatingToken(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
 	responsableStore.AddTokenResponses = []error{errors.New("ERROR")}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1503,7 +1665,7 @@ func Test_LongTermLogin_Error_ErrorCreatingToken(t *testing.T) {
 
 func Test_LongTermLogin_Success(t *testing.T) {
 	authorization := T_CreateAuthorization(t, "a@b.co", "password")
-	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{&User{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+	responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
 	responsableStore.AddTokenResponses = []error{nil}
 	defer T_ExpectResponsablesEmpty(t)
 
@@ -1533,7 +1695,7 @@ func TestHasServerToken_True(t *testing.T) {
 	shoreline.ServerLogin(response, svrLoginRequest)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	if response.Header().Get(TP_SESSION_TOKEN) == "" {
@@ -1573,7 +1735,7 @@ func TestServerCheckToken_StatusOK(t *testing.T) {
 	shoreline.ServerCheckToken(checkTokenResponse, checkTokenRequest, map[string]string{"token": svrTokenToUse})
 
 	if checkTokenResponse.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, checkTokenResponse.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	if checkTokenResponse.Header().Get("content-type") != "application/json" {
@@ -1597,9 +1759,6 @@ func TestServerCheckToken_StatusOK(t *testing.T) {
 }
 
 func TestServerCheckToken_StatusUnauthorized_WhenNoSvrToken(t *testing.T) {
-
-	//the api
-
 	shoreline.SetHandlers("", rtr)
 
 	request, _ := http.NewRequest("GET", "/", nil)
@@ -1607,14 +1766,14 @@ func TestServerCheckToken_StatusUnauthorized_WhenNoSvrToken(t *testing.T) {
 
 	shoreline.ServerCheckToken(response, request, NO_PARAMS)
 
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusUnauthorized, response.Code)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func TestLogout_StatusOK_WhenNoToken(t *testing.T) {
+func TestLogout_StatusBadRequest_WhenNoToken(t *testing.T) {
 	request, _ := http.NewRequest("POST", "/", nil)
 	response := httptest.NewRecorder()
 
@@ -1622,8 +1781,8 @@ func TestLogout_StatusOK_WhenNoToken(t *testing.T) {
 
 	shoreline.Logout(response, request)
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusBadRequest, response.Code)
 	}
 }
 
@@ -1638,7 +1797,7 @@ func TestLogout_StatusOK(t *testing.T) {
 	shoreline.Logout(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 }
 
@@ -1673,7 +1832,7 @@ func TestAnonymousIdHashPair_StatusOK(t *testing.T) {
 	shoreline.AnonymousIdHashPair(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	if response.Header().Get("content-type") != "application/json" {
@@ -1708,7 +1867,7 @@ func TestAnonymousIdHashPair_StatusOK_EvenWhenNoURLParams(t *testing.T) {
 	shoreline.AnonymousIdHashPair(response, request)
 
 	if response.Code != http.StatusOK {
-		t.Fatalf("Non-expected status code%v:\n\tbody: %v", http.StatusOK, response.Code)
+		t.Fatalf("Expected [%v] and got [%v]", http.StatusOK, response.Code)
 	}
 
 	if response.Header().Get("content-type") != "application/json" {
@@ -1870,7 +2029,6 @@ func Test_AuthenticateSessionToken_Success_User(t *testing.T) {
 
 func Test_AuthenticateSessionToken_Success_Server(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
-	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
 	defer T_ExpectResponsablesEmpty(t)
 
 	tokenData, err := responsableShoreline.authenticateSessionToken(context.Background(), sessionToken.ID)

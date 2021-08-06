@@ -111,6 +111,7 @@ const (
 	STATUS_INVALID_USER_DETAILS  = "Invalid user details were given"
 	STATUS_USER_NOT_FOUND        = "User not found"
 	STATUS_ERR_FINDING_USR       = "Error finding user"
+	STATUS_ERR_DELETE_USR        = "Error deleting user"
 	STATUS_ERR_CREATING_USR      = "Error creating the user"
 	STATUS_ERR_UPDATING_USR      = "Error updating user"
 	STATUS_USR_ALREADY_EXISTS    = "User already exists"
@@ -126,8 +127,6 @@ const (
 	STATUS_ERR_SENDING_EMAIL     = "Error sending email"
 	STATUS_NO_TOKEN              = "No x-tidepool-session-token was found"
 	STATUS_SERVER_TOKEN_REQUIRED = "A server token is required"
-	STATUS_AUTH_HEADER_REQUIRED  = "Authorization header is required"
-	STATUS_AUTH_HEADER_INVLAID   = "Authorization header is invalid"
 	STATUS_GETSTATUS_ERR         = "Error checking service status"
 	STATUS_UNAUTHORIZED          = "Not authorized for requested operation"
 	STATUS_NO_QUERY              = "A query must be specified"
@@ -233,6 +232,7 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 	} else if found {
 		config.TokenDurationSecs = int64(intValue)
 	}
+	log.Printf("Token duration seconds %d", config.TokenDurationSecs)
 
 	salt, found := os.LookupEnv("SALT")
 	if found && len(salt) > 0 {
@@ -401,7 +401,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 	} else {
 		tokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: newUser.Id, IsServer: false, Role: "unverified"}
 		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), &tokenData, tokenConfig, a.Store); err != nil {
+		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), &tokenData, &tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
 		} else {
 			a.logAudit(req, &tokenData, "CreateUser isClinic{%t}", newUser.IsClinic())
@@ -586,8 +586,8 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 	}
 }
 
-// @Summary Delete user
-// @Description Delete user
+// @Summary Delete a user
+// @Description Delete a user
 // @ID shoreline-user-api-deleteuser
 // @Accept  json
 // @Produce  json
@@ -595,55 +595,78 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Param password body string true "password"
 // @Security TidepoolAuth
 // @Success 202 "User deleted"
+// @Failure 400 {object} status.Status "message returned:\"Missing id and/or password\" "
+// @Failure 401 {string} status.Status "messages: \"Not authorized for requested operation\""
+// @Failure 403 {object} status.Status "message returned:\"Wrong password\""
+// @Failure 404 {object} status.Status "message returned:\"User not found\" "
 // @Failure 500 {string} string ""
-// @Failure 403 {object} status.Status "message returned:\"Missing id and/or password\" "
-// @Failure 401 {string} string ""
 // @Router /user/{userid} [delete]
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-
 	td, err := a.authenticateSessionToken(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
+	a.logAudit(req, td, "DeleteUser")
 
 	if err != nil {
-		a.logger.Println(http.StatusUnauthorized, err.Error())
-		res.WriteHeader(http.StatusUnauthorized)
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "DeleteUser verify token:", err)
 		return
 	}
 
-	var id string
-	if td.IsServer == true {
-		id = vars["userid"]
-		a.logger.Println("operating as server")
-	} else {
-		id = td.UserId
+	if vars == nil {
+		// Should never happen, but in case, don't crash
+		a.sendError(res, http.StatusInternalServerError, STATUS_NO_QUERY, "DeleteUser: vars is nil")
+		return
 	}
 
-	pw := getGivenDetail(req)["password"]
+	id, ok := vars["userid"]
+	if !ok || id == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, "DeleteUser", "Missing userid in query")
+		return
+	}
 
-	if id != "" && pw != "" {
+	if !td.IsServer && id != td.UserId {
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "DeleteUser: can't delete another user")
+		return
+	}
 
-		var err error
-		toDelete := &User{Id: id}
+	toDelete := &User{Id: id}
 
-		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); err == nil {
-			if err = a.Store.RemoveUser(req.Context(), toDelete); err == nil {
-
-				a.logAudit(req, td, "DeleteUser")
-				//cleanup if any
-				if td.IsServer == false {
-					a.Store.RemoveTokenByID(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
-				}
-				//all good
-				res.WriteHeader(http.StatusAccepted)
-				return
-			}
+	if !td.IsServer {
+		// A user want to delete it's account: check the password passed in the body
+		pw, ok := a.getGivenDetail(req)["password"]
+		if !ok || pw == "" {
+			a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, "DeleteUser", fmt.Sprintf("Missing password in body ok{%v} pw{%v}", ok, pw))
+			return
 		}
-		a.logger.Println(http.StatusInternalServerError, err.Error())
-		res.WriteHeader(http.StatusInternalServerError)
+
+		user, err := a.Store.FindUser(req.Context(), toDelete)
+		if err != nil || user == nil {
+			a.sendError(res, http.StatusNotFound, STATUS_USER_NOT_FOUND, "DeleteUser", err)
+			return
+		}
+
+		if !user.PasswordsMatch(pw, a.ApiConfig.Salt) {
+			a.sendError(res, http.StatusForbidden, STATUS_PW_WRONG, "DeleteUser: Password don't match")
+			return
+		}
+	} // else: Server token do not need to give a password, it can't have it anyway
+
+	// Good, try to delete the user
+	err = a.Store.RemoveUser(req.Context(), toDelete)
+	if err != nil {
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_DELETE_USR, "DeleteUser", err)
 		return
 	}
-	a.logger.Println(http.StatusForbidden, STATUS_MISSING_ID_PW)
-	sendModelAsResWithStatus(res, status.NewStatus(http.StatusForbidden, STATUS_MISSING_ID_PW), http.StatusForbidden)
-	return
+
+	// Clean-up user tokens: TODO Delete all user token?
+	if td.IsServer == false {
+		err = a.Store.RemoveTokenByID(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
+		if err != nil {
+			// Just log the error
+			a.logAudit(req, td, "Error while removing the token: %v", err)
+		}
+	}
+
+	// All good
+	res.WriteHeader(http.StatusAccepted)
 }
 
 // @Summary Login user
@@ -710,9 +733,11 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		role := "patient"
 		if result.Roles != nil && len(result.Roles) > 0 {
 			role = result.Roles[0]
+		} else {
+			a.logger.Printf("User role of %s is empty: replaced by role patient", result.Id)
 		}
 		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: role}
-		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
+		tokenConfig := &token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
 
@@ -775,29 +800,27 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// If the expected secret is the one given at the door then we can generate a token
-	if pw == expectedSecret {
-		//generate new token
-		if sessionToken, err := CreateSessionTokenAndSave(
-			req.Context(),
-			&token.TokenData{DurationSecs: extractTokenDuration(req), UserId: server, IsServer: true},
-			token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret},
-			a.Store,
-		); err != nil {
-			// Error generating the token
-			a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
-			sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
-			return
-		} else {
-			// Server is provided with the generated token
-			a.logAudit(req, nil, "ServerLogin")
-			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-			return
-		}
+	if pw != expectedSecret {
+		// If the password given at the door is wrong, we cannot generate the token
+		a.logger.Println(http.StatusUnauthorized, STATUS_PW_WRONG)
+		sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_PW_WRONG), http.StatusUnauthorized)
+		return
 	}
-	// If the password given at the door is wrong, we cannot generate the token
-	a.logger.Println(http.StatusUnauthorized, STATUS_PW_WRONG)
-	sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_PW_WRONG), http.StatusUnauthorized)
-	return
+
+	// Generate a new token
+	tokenData := &token.TokenData{UserId: server, IsServer: true}
+	tokenConfig := &token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
+	sessionToken, err := token.CreateSessionToken(tokenData, tokenConfig)
+	if err != nil {
+		// Error generating the token
+		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
+		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
+		return
+	}
+
+	// Server is provided with the generated token
+	a.logAudit(req, tokenData, "ServerLogin")
+	res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 }
 
 // @Summary Refresh session
@@ -814,48 +837,57 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Failure 401 {string} string ""
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
-	a.logger.Printf("refresh session with trace token %v", req.Header.Get(TP_TRACE_SESSION))
-	td, err := a.authenticateSessionToken(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
+	var err error // be sure to have only one err var declared!
+	traceToken := fmt.Sprintf("traceToken{%s}", req.Header.Get(TP_TRACE_SESSION))
+
+	tokenData, err := a.authenticateSessionToken(req.Context(), req.Header.Get(TP_SESSION_TOKEN))
+	if err != nil {
+		a.logAudit(req, tokenData, "RefreshSession: Authentication failed")
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, traceToken, "RefreshSession: Authentication failed", err)
+		return
+	}
+
+	var sessionToken *token.SessionToken
+	tokenConfig := &token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
+
+	if tokenData.IsServer {
+		tokenData.DurationSecs = 0
+		sessionToken, err = token.CreateSessionToken(tokenData, tokenConfig)
+
+	} else {
+		// User token: retrieve User in Db for having last information (role)
+		var user *User
+		user, err = a.Store.FindUser(req.Context(), &User{Id: tokenData.UserId})
+		if err != nil {
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, traceToken, err)
+			return
+		}
+		if user == nil {
+			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, traceToken, "RefreshSession: User not found")
+			return
+		}
+
+		// TODO: replace this workaround, there should be only one role when the data is cleaned up
+		role := "patient"
+		if user.Roles != nil && len(user.Roles) > 0 {
+			role = user.Roles[0]
+		} else {
+			a.logger.Printf("User role of %s is empty: replaced by role patient", user.Id)
+		}
+
+		// Refresh token with update user information
+		tokenData = &token.TokenData{UserId: user.Id, IsServer: false, Role: role}
+		sessionToken, err = CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store)
+	}
 
 	if err != nil {
-		a.logger.Println(http.StatusUnauthorized, err.Error())
-		res.WriteHeader(http.StatusUnauthorized)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, traceToken, "RefreshSession: CreateSessionToken")
 		return
 	}
 
-	// retrieve User in Db for having last information (role)
-	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
-	if errUser != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
-
-	} else if user == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
-	}
-
-	// Set Role
-	var role string
-	if user.Roles != nil && len(user.Roles) > 0 {
-		role = user.Roles[0]
-	}
-
-	//refresh token with update user information
-	newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: user.Id, IsServer: false, Role: role}
-	tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: a.ApiConfig.Secret}
-	if sessionToken, err := CreateSessionTokenAndSave(
-		req.Context(),
-		&newTokenData,
-		tokenConfig,
-		a.Store,
-	); err != nil {
-		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
-		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
-		return
-	} else {
-		a.logAudit(req, td, "Refresh session token with last user information")
-		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-		sendModelAsRes(res, td)
-		return
-	}
+	a.logAudit(req, tokenData, "RefreshSession: OK")
+	res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
+	sendModelAsRes(res, tokenData)
 }
 
 // @Summary Longterm login
@@ -894,32 +926,63 @@ func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map
 }
 
 // @Summary Check server token
-// @Description Check server token
+//
+// @Description Verify the provided token in the URL is valid.
+// Can only be used by a service with a valid server token
+//
 // @ID shoreline-user-api-serverchecktoken
-// @Accept  json
-// @Produce  json
+// @Produce json
+//
 // @Param token path string true "server token to check"
 // @Security TidepoolAuth
-// @Success 200 {object} token.TokenData  "Token details"
-// @Failure 401 {object} status.Status "message returned:\"No x-tidepool-session-token was found\" "
+//
+// @Success 200 {object} token.TokenData "Token details"
+// @Failure 400 {object} status.Status "message returned: \"No x-tidepool-session-token was found\" or \"A query must be specified\""
+// @Failure 401 {object} status.Status "message returned: \"A server token is required\" (invalid token provided in x-tidepool-session-token)"
+// @Failure 403 {object} status.Status "message returned: \"No token matched the given details\" (the token to verify is invalid)"
+//
 // @Router /token/{token} [get]
 func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars map[string]string) {
+	// Only services can check for a valid token
+	// The server token must be in the header (x-tidepool-session-token)
+	// and the token to verify in the URL
 
-	if hasServerToken(req.Header.Get(TP_SESSION_TOKEN), a.ApiConfig.Secret) {
-		td, err := a.authenticateSessionToken(req.Context(), vars["token"])
-		if err != nil {
-			a.logger.Printf("failed request: %v", req)
-			a.logger.Println(http.StatusUnauthorized, STATUS_NO_TOKEN, err.Error())
-			sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_NO_TOKEN), http.StatusUnauthorized)
-			return
-		}
-		sendModelAsRes(res, td)
+	var err error
+	var tokenDataOfTheService *token.TokenData
+	var tokenDataToValidate *token.TokenData
+
+	tokenOfTheService := req.Header.Get(TP_SESSION_TOKEN)
+	tokenToValidate := vars["token"]
+
+	if tokenOfTheService == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_TOKEN, "ServerCheckToken")
 		return
 	}
-	a.logger.Println(http.StatusUnauthorized, STATUS_NO_TOKEN)
-	a.logger.Printf("header session token: %v", req.Header.Get(TP_SESSION_TOKEN))
-	sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_NO_TOKEN), http.StatusUnauthorized)
-	return
+
+	if tokenToValidate == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY, "ServerCheckToken")
+		return
+	}
+
+	// Verify tokenDataOfTheService is a server token
+	tokenDataOfTheService, err = a.authenticateSessionToken(req.Context(), tokenOfTheService)
+	if err != nil || tokenDataOfTheService == nil || tokenDataOfTheService.IsServer == false {
+		a.logAudit(req, tokenDataOfTheService, "ServerCheckToken{tokenDataOfTheService}")
+		a.sendError(res, http.StatusUnauthorized, STATUS_SERVER_TOKEN_REQUIRED, "ServerCheckToken")
+		return
+	}
+
+	// Verify the supplied token in the URL
+	tokenDataToValidate, err = a.authenticateSessionToken(req.Context(), tokenToValidate)
+	if err != nil || tokenDataToValidate == nil {
+		a.logAudit(req, tokenDataOfTheService, "ServerCheckToken{tokenDataToValidate}")
+		a.sendError(res, http.StatusForbidden, STATUS_NO_TOKEN_MATCH, "ServerCheckToken")
+		return
+	}
+
+	// No error, everything is in order
+	a.logAudit(req, tokenDataOfTheService, "ServerCheckToken OK (%s)", tokenDataToValidate.ToStringForLog())
+	sendModelAsRes(res, tokenDataToValidate)
 }
 
 // @Summary Logout
@@ -929,18 +992,33 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Produce  json
 // @Security TidepoolAuth
 // @Success 200 {string} string ""
+// @Failure 400 {object} status.Status "message returned:\"No x-tidepool-session-token was found\""
+// @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
-	if id := req.Header.Get(TP_SESSION_TOKEN); id != "" {
-		if err := a.Store.RemoveTokenByID(req.Context(), id); err != nil {
-			//silently fail but still log it
+	sessionToken := req.Header.Get(TP_SESSION_TOKEN)
+	if sessionToken == "" {
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_TOKEN)
+		return
+	}
+
+	// tokenData, err := a.authenticateSessionToken(req.Context(), token)
+	tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret)
+	if err != nil {
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Invalid token", err)
+		return
+	}
+
+	if !tokenData.IsServer {
+		if err := a.Store.RemoveTokenByID(req.Context(), sessionToken); err != nil {
+			// Silently fail but still log it
 			a.logger.Println("Logout was unable to delete token", err.Error())
 		}
 	}
+
 	// otherwise all good
-	a.logAudit(req, nil, "Logout")
+	a.logAudit(req, tokenData, "Logout")
 	res.WriteHeader(http.StatusOK)
-	return
 }
 
 // @Summary AnonymousIdHashPair ?
@@ -971,7 +1049,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 
 	secret := ""
 	service := vars["service"]
-	if service == "" {
+	if service == "" || service == "default" {
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN), http.StatusBadRequest)
 		return
 	} else {
@@ -996,7 +1074,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 	//refresh
 	if sessionToken, err := token.CreateSessionToken(
 		td,
-		token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: secret},
+		&token.TokenConfig{DurationSecs: a.ApiConfig.TokenDurationSecs, Secret: secret},
 	); err != nil {
 		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
@@ -1036,6 +1114,9 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 
 	case STATUS_ERR_FINDING_USR:
 		httpErrorCounter.WithLabelValues(STATUS_ERR_FINDING_USR).Inc()
+
+	case STATUS_ERR_DELETE_USR:
+		httpErrorCounter.WithLabelValues(STATUS_ERR_DELETE_USR).Inc()
 
 	case STATUS_ERR_CREATING_USR:
 		httpErrorCounter.WithLabelValues(STATUS_ERR_CREATING_USR).Inc()
@@ -1082,12 +1163,6 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 	case STATUS_SERVER_TOKEN_REQUIRED:
 		httpErrorCounter.WithLabelValues(STATUS_SERVER_TOKEN_REQUIRED).Inc()
 
-	case STATUS_AUTH_HEADER_REQUIRED:
-		httpErrorCounter.WithLabelValues(STATUS_AUTH_HEADER_REQUIRED).Inc()
-
-	case STATUS_AUTH_HEADER_INVLAID:
-		httpErrorCounter.WithLabelValues(STATUS_AUTH_HEADER_INVLAID).Inc()
-
 	case STATUS_GETSTATUS_ERR:
 		httpErrorCounter.WithLabelValues(STATUS_GETSTATUS_ERR).Inc()
 
@@ -1109,28 +1184,6 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 
 	a.logger.Printf("%s:%d RESPONSE ERROR: [%d %s] %s", file, line, statusCode, reason, strings.Join(messages, "; "))
 	sendModelAsResWithStatus(res, status.NewStatus(statusCode, reason), statusCode)
-}
-
-func (a *Api) authenticateSessionToken(ctx context.Context, sessionToken string) (*token.TokenData, error) {
-	if sessionToken == "" {
-		return nil, errors.New("Session token is empty")
-	} else if tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
-		return nil, err
-	} else if _, err := a.Store.FindTokenByID(ctx, sessionToken); err != nil {
-		return nil, err
-	} else {
-		return tokenData, nil
-	}
-}
-
-func (a *Api) isAuthorized(tokenData *token.TokenData, userID string) bool {
-	if tokenData.IsServer {
-		return true
-	}
-	if tokenData.UserId == userID {
-		return true
-	}
-	return false
 }
 
 // UpdateUserAfterFailedLogin update the user failed login infos in database

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-
 	"github.com/mdblp/shoreline/token"
 )
 
@@ -49,11 +48,11 @@ func firstStringNotEmpty(strs ...string) string {
 	return ""
 }
 
-//Docode the http.Request parsing out the user details
-func getGivenDetail(req *http.Request) (d map[string]string) {
+// Decode the http.Request parsing out the user details
+func (a *Api) getGivenDetail(req *http.Request) (d map[string]string) {
 	if req.ContentLength > 0 {
 		if err := json.NewDecoder(req.Body).Decode(&d); err != nil {
-			log.Print(USER_API_PREFIX, "error trying to decode user detail ", err)
+			a.logger.Print(USER_API_PREFIX, "error trying to decode user detail ", err)
 			return nil
 		}
 	}
@@ -135,11 +134,11 @@ func (a *Api) logAudit(req *http.Request, tokenData *token.TokenData, format str
 	}
 
 	if tokenData != nil {
-		prefix += fmt.Sprintf("isServer{%t}, ", tokenData.IsServer)
+		prefix += tokenData.ToStringForLog()
 	}
 
 	s := fmt.Sprintf(format, args...)
-	a.auditLogger.Printf("%s%s", prefix, s)
+	a.auditLogger.Printf("%s %s", prefix, s)
 }
 
 func (a *Api) sendUser(res http.ResponseWriter, user *User, isServerRequest bool) {
@@ -221,7 +220,49 @@ func (a *Api) removeUserLoginInProgress(elem *list.Element) {
 	a.loginLimiter.mutex.Unlock()
 }
 
-func CreateSessionTokenAndSave(ctx context.Context, data *token.TokenData, config token.TokenConfig, store Storage) (*token.SessionToken, error) {
+func (a *Api) authenticateSessionToken(ctx context.Context, sessionToken string) (*token.TokenData, error) {
+	if sessionToken == "" {
+		return nil, errors.New("Session token is empty")
+	}
+
+	tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret)
+	if err != nil {
+		return nil, err
+	}
+
+	if tokenData == nil {
+		// This should never be true, but to be sure
+		return nil, errors.New("Failed to verify the token")
+	}
+
+	if !tokenData.IsServer {
+		// User token search it in the database
+		result, err := a.Store.FindTokenByID(ctx, sessionToken)
+		if err != nil {
+			return nil, err
+		}
+		if result == nil {
+			return nil, errors.New("No token found")
+		}
+		if tokenData.UserId != result.UserID {
+			return nil, fmt.Errorf("Token userID do not match token{%s} database{%s}", tokenData.UserId, result.UserID)
+		}
+	}
+
+	return tokenData, nil
+}
+
+func (a *Api) isAuthorized(tokenData *token.TokenData, userID string) bool {
+	if tokenData.IsServer {
+		return true
+	}
+	if tokenData.UserId == userID {
+		return true
+	}
+	return false
+}
+
+func CreateSessionTokenAndSave(ctx context.Context, data *token.TokenData, config *token.TokenConfig, store Storage) (*token.SessionToken, error) {
 	sessionToken, err := token.CreateSessionToken(data, config)
 	if err != nil {
 		return nil, err

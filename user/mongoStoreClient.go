@@ -53,11 +53,10 @@ func (c *Client) UpsertUser(ctx context.Context, user *User) error {
 }
 
 func (c *Client) FindUser(ctx context.Context, user *User) (result *User, err error) {
-
 	if user.Id != "" {
 		opts := options.FindOne()
 		if err = mgoUsersCollection(c).FindOne(ctx, bson.M{"userid": user.Id}, opts).Decode(&result); err != nil {
-			return result, err
+			return nil, err
 		}
 	}
 

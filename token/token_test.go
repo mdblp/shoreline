@@ -9,7 +9,7 @@ import (
 
 type tokenTestData struct {
 	data   *TokenData
-	config TokenConfig
+	config *TokenConfig
 }
 
 var tokenConfig = TokenConfig{
@@ -21,7 +21,7 @@ func Test_GenerateSessionToken(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 3600},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -61,7 +61,7 @@ func Test_GenerateSessionToken_DurationFromConfig(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 0},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	//given duration seconds trump the configured duration
@@ -82,7 +82,7 @@ func Test_GenerateSessionToken_DurationSecsTrumpConfig(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -103,7 +103,7 @@ func Test_GenerateSessionToken_Zendesk_Claims_Patient(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Audience: "zendesk", Role: "patient"},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -132,7 +132,7 @@ func Test_GenerateSessionToken_Zendesk_Claims_Caregiver(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Audience: "zendesk", Role: "caregiver"},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -161,7 +161,7 @@ func Test_GenerateSessionToken_Zendesk_Claims_Pro(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Audience: "zendesk", Role: "hcp"},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -190,7 +190,7 @@ func Test_GenerateSessionToken_With_UserDetails(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "12-99-100", IsServer: false, DurationSecs: 5000, Email: "user@test.com", Name: "John Doe", Role: "hcp"},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -221,7 +221,7 @@ func Test_GenerateSessionToken_NoUserId(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "", IsServer: false, DurationSecs: 3600},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	if _, err := CreateSessionToken(testData.data, testData.config); err == nil {
@@ -233,7 +233,7 @@ func Test_GenerateSessionToken_Server(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "shoreline", IsServer: true, DurationSecs: 0},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -248,17 +248,16 @@ func Test_GenerateSessionToken_Server(t *testing.T) {
 		t.Fatal("this should be a server token")
 	}
 
-	if td.DurationSecs != 24*60*60 {
-		t.Fatal("the duration should be 24hrs")
+	if td.DurationSecs != tokenConfig.DurationSecs {
+		t.Fatalf("expected token duration %v to be %v ", time.Duration(td.DurationSecs)*time.Second, time.Duration(tokenConfig.DurationSecs)*time.Second)
 	}
-
 }
 
 func Test_UnpackedData(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "111", IsServer: true, DurationSecs: 0, Email: "user@test.com", Name: "John Doe", Role: "hcp"},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -298,7 +297,7 @@ func Test_UnpackTokenExpires(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -321,7 +320,7 @@ func Test_UnpackAndVerifyStoredToken(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1200},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)
@@ -338,7 +337,7 @@ func Test_getUnpackedToken(t *testing.T) {
 
 	testData := tokenTestData{
 		data:   &TokenData{UserId: "2341", IsServer: false, DurationSecs: 1},
-		config: tokenConfig,
+		config: &tokenConfig,
 	}
 
 	token, _ := CreateSessionToken(testData.data, testData.config)

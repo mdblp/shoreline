@@ -30,6 +30,7 @@ RUN /bin/bash -c '/usr/local/bin/docker-entrypoint.sh mongod &' && \
     PATH=$PATH:/go/bin:$(/go/bin/go env GOPATH)/bin bash test.sh && echo 'No Error !' ; \
     sleep 1 && \
     kill "$(ps -C mongod -o pid=)" && \
-    sleep 1
+    sleep 1 && \
+    /bin/cat test-report.xml || /bin/true
 
 ENTRYPOINT ["/bin/cat", "coverReport.html"]

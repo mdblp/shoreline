@@ -267,7 +267,7 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 func TestMongoStoreTokenOperations(t *testing.T) {
 
 	testing_token_data := &token.TokenData{UserId: "2341", IsServer: true, DurationSecs: 3600}
-	testing_token_config := token.TokenConfig{DurationSecs: 1200, Secret: "some secret for the tests"}
+	testing_token_config := &token.TokenConfig{DurationSecs: 1200, Secret: "some secret for the tests"}
 
 	ctx := context.Background()
 	mc, err := mgoTestSetup()
@@ -287,7 +287,7 @@ func TestMongoStoreTokenOperations(t *testing.T) {
 		t.Fatalf("we could not save the token %v", err)
 	}
 
-	if foundToken, err := mc.FindTokenByID(ctx, sessionToken.ID); err == nil {
+	if foundToken, err := mc.FindTokenByID(ctx, sessionToken.ID); err == nil && foundToken != nil {
 		if foundToken.ID == "" {
 			t.Fatalf("the token string isn't included %v", foundToken)
 		}
