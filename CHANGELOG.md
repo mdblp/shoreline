@@ -3,6 +3,8 @@
 Shoreline is the module that manages logins and user accounts.
 
 ## Unreleased
+### Changed
+- YLP-934 Token creation and renew should use the configured value
 ### Engineering
 - YLP-924 Bump to go-common v1
 
