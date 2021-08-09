@@ -1002,7 +1002,6 @@ func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// tokenData, err := a.authenticateSessionToken(req.Context(), token)
 	tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret)
 	if err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Invalid token", err)

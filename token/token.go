@@ -45,6 +45,7 @@ const (
 	TP_SESSION_TOKEN   = "x-tidepool-session-token"
 	// TP_TRACE_SESSION Session trace: uuid v4
 	TP_TRACE_SESSION = "x-tidepool-trace-session"
+	signAlg          = "HS256"
 )
 
 var (
@@ -53,24 +54,12 @@ var (
 	errorSessionTokenInvalid          = errors.New("SessionToken: is invalid")
 	errorSessionTokenNoDuration       = errors.New("SessionToken: dur not set")
 	errorSessionTokenExpirationNotSet = errors.New("SessionToken: exp not set")
-	errorSessionTokenUsrNotSet        = errors.New("SessionToken: exp not set")
+	errorSessionTokenUsrNotSet        = errors.New("SessionToken: usr not set")
+	errorSessionTokenJtiNotSet        = errors.New("SessionToken: jti not set")
+	errorSessionTokenInvalidSignAlg   = errors.New("SessionToken: invalid sign method")
 )
 
-// UnpackSessionTokenAndVerify verify that the provided token string is valid
-func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
-	if id == "" {
-		return nil, errorSessionTokenEmpty
-	}
-
-	jwtToken, err := jwt.Parse(id, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil })
-	if err != nil {
-		return nil, err
-	}
-	if !jwtToken.Valid {
-		return nil, errorSessionTokenInvalid
-	}
-
-	claims := jwtToken.Claims.(jwt.MapClaims)
+func parseClaims(claims jwt.MapClaims) (*TokenData, error) {
 	isServer := claims["svr"] == "yes"
 	durationSecs, ok := claims["dur"].(int64)
 	if !ok {
@@ -112,7 +101,7 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	}
 	jti, ok := claims["jti"].(string)
 	if !ok {
-		return nil, errors.New("Missing jti")
+		return nil, errorSessionTokenJtiNotSet
 	}
 
 	return &TokenData{
@@ -127,6 +116,37 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	}, nil
 }
 
+// ParseUnverified just parse the token content, without validating the signature
+func ParseUnverified(id string) (*TokenData, error) {
+	jwtToken, _, err := new(jwt.Parser).ParseUnverified(id, jwt.MapClaims{})
+	if err != nil {
+		return nil, err
+	}
+
+	if jwtToken.Method.Alg() != signAlg {
+		return nil, errorSessionTokenInvalidSignAlg
+	}
+	return parseClaims(jwtToken.Claims.(jwt.MapClaims))
+}
+
+// UnpackSessionTokenAndVerify verify that the provided token string is valid
+func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
+	if id == "" {
+		return nil, errorSessionTokenEmpty
+	}
+
+	jwtToken, err := jwt.Parse(id, func(t *jwt.Token) (interface{}, error) { return []byte(secret), nil })
+	if err != nil {
+		return nil, err
+	}
+	if !jwtToken.Valid {
+		return nil, errorSessionTokenInvalid
+	}
+
+	return parseClaims(jwtToken.Claims.(jwt.MapClaims))
+}
+
+// CreateSessionToken generate the signed token string from the provided information
 func CreateSessionToken(data *TokenData, config *TokenConfig) (*SessionToken, error) {
 	if data.UserId == "" {
 		return nil, errorSessionTokenNoUserID
@@ -140,8 +160,8 @@ func CreateSessionToken(data *TokenData, config *TokenConfig) (*SessionToken, er
 	createdAt := now.Unix()
 	expiresAt := now.Add(time.Duration(data.DurationSecs) * time.Second).Unix()
 
-	jwt_token := jwt.New(jwt.GetSigningMethod("HS256"))
-	claims := jwt_token.Claims.(jwt.MapClaims)
+	jwtToken := jwt.New(jwt.GetSigningMethod(signAlg))
+	claims := jwtToken.Claims.(jwt.MapClaims)
 	if data.IsServer {
 		claims["svr"] = "yes"
 	} else {
@@ -175,7 +195,7 @@ func CreateSessionToken(data *TokenData, config *TokenConfig) (*SessionToken, er
 	claims["iat"] = createdAt
 	claims["jti"] = uuid.New()
 
-	tokenString, err := jwt_token.SignedString([]byte(config.Secret))
+	tokenString, err := jwtToken.SignedString([]byte(config.Secret))
 	if err != nil {
 		return nil, err
 	}

@@ -62,6 +62,7 @@ func NewShorelineClientBuilder() *ClientBuilder {
 	return &ClientBuilder{
 		config: &ClientConfig{
 			TokenRefreshInterval: jepson.Duration(6 * time.Hour),
+			TokenGetInterval:     time.Duration(time.Duration(10) * time.Second),
 		},
 	}
 }
@@ -175,6 +176,20 @@ func (client *Client) Start() error {
 	return nil
 }
 
+func (client *Client) getNextRefreshInterval() time.Duration {
+	if client.serverToken != "" {
+		tokenData, err := token.ParseUnverified(client.serverToken)
+		if err == nil && tokenData != nil {
+			exp := time.Unix(tokenData.ExpiresAt, 0)
+			now := time.Now()
+			if exp.After(now) {
+				return exp.Sub(now)
+			}
+		}
+	}
+	return time.Duration(client.config.TokenRefreshInterval)
+}
+
 func (client *Client) serverLoginLoop(launchRefreshTokenLoop bool) {
 	var attempts int64
 	client.mut.Lock()
@@ -185,7 +200,7 @@ func (client *Client) serverLoginLoop(launchRefreshTokenLoop bool) {
 	client.acquiringToken = true
 	client.mut.Unlock()
 	for {
-		timer := time.After(time.Duration(client.config.TokenGetInterval))
+		timer := time.After(client.config.TokenGetInterval)
 		select {
 		case twoWay := <-client.closed:
 			twoWay <- true
@@ -201,17 +216,16 @@ func (client *Client) serverLoginLoop(launchRefreshTokenLoop bool) {
 					go client.refreshTokenLoop()
 				}
 				return
-			} else {
-				attempts++
-				log.Printf("Error when getting server token (attempt %v). Error: %v", attempts, err)
 			}
+			attempts++
+			log.Printf("Error when getting server token (attempt %v). Error: %v", attempts, err)
 		}
 	}
 }
 
 func (client *Client) refreshTokenLoop() {
 	for {
-		timer := time.After(time.Duration(client.config.TokenRefreshInterval))
+		timer := time.After(client.getNextRefreshInterval())
 		select {
 		case twoWay := <-client.closed:
 			twoWay <- true
@@ -229,6 +243,8 @@ func (client *Client) refreshTokenLoop() {
 		}
 	}
 }
+
+// Close stop the refresh token loop, must be called when the service is stopped
 func (client *Client) Close() {
 	twoWay := make(chan bool)
 	client.closed <- twoWay
