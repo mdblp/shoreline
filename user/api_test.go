@@ -32,9 +32,7 @@ const (
 
 func InitAPITest(cfg *ApiConfig, logger *log.Logger, store Storage) *Api {
 	cfg.ServerSecrets = make(map[string]string)
-	for _, sec := range cfg.Secrets {
-		cfg.ServerSecrets[sec.Secret] = sec.Pass
-	}
+	cfg.ServerSecrets["default"] = THE_SECRET
 	api := Api{
 		Store:       store,
 		ApiConfig:   cfg,
@@ -50,10 +48,6 @@ var (
 	TOKEN_DURATION = int64(3600)
 	tokenSecrets   = make(map[string]string)
 	FAKE_CONFIG    = &ApiConfig{
-		Secrets: []Secret{
-			{Secret: "default", Pass: "This needs to be the same secret everywhere. YaHut75NsK1f9UKUXuWqxNN0RUwHFBCy"},
-			{Secret: "product_website", Pass: "Not so secret"},
-		},
 		TokenSecrets:                tokenSecrets,
 		Secret:                      "This is a local API secret for everyone. BsscSHqSHiwrBMJsEGqbvXiuIUPAjQXU",
 		TokenDurationSecs:           TOKEN_DURATION,

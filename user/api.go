@@ -28,20 +28,20 @@ import (
 
 var (
 	exceededConcurrentLoginCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "concurrent_exceeded_login_total",
-		Help: "the total number of concurrent exceeded login",
+		Name:      "concurrent_exceeded_login_total",
+		Help:      "the total number of concurrent exceeded login",
 		Subsystem: "shoreline",
 		Namespace: "dblp",
 	})
 	httpErrorCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "http_errors_total",
-		Help: "The total number of http errors by type of errors",
+		Name:      "http_errors_total",
+		Help:      "The total number of http errors by type of errors",
 		Subsystem: "shoreline",
 		Namespace: "dblp",
 	}, []string{"error_type"})
 	inFligthLogin = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "in_flight_login_request",
-		Help: "the total number of concurrent login request",
+		Name:      "in_flight_login_request",
+		Help:      "the total number of concurrent login request",
 		Subsystem: "shoreline",
 		Namespace: "dblp",
 	})
@@ -63,7 +63,6 @@ type (
 	// ApiConfig for shoreline
 	ApiConfig struct {
 		//used for services
-		Secrets           []Secret `json:"secrets"`
 		ServerSecrets     map[string]string
 		LongTermKey       string `json:"longTermKey"`
 		LongTermsDuration int64  `json:"longTermDuration"`
@@ -241,12 +240,6 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 
 // New create a new shoreline API config
 func New(cfg *ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger) *Api {
-	// Server secrets retrieved from configuration are transformed into a hashtable for ease of access
-	// They are stored in a public property called ServerSecrets
-	for _, sec := range cfg.Secrets {
-		cfg.ServerSecrets[sec.Secret] = sec.Pass
-	}
-
 	api := Api{
 		Store:       store,
 		ApiConfig:   cfg,
