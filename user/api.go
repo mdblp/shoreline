@@ -194,6 +194,10 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 	if found {
 		config.ServerSecrets["default"] = serverSecret
 	}
+	serverSecret, found = os.LookupEnv("AUTHENT_API_SECRET")
+	if found {
+		config.ServerSecrets["authent_api"] = serverSecret
+	}
 	// extract the list of token secrets
 	zdkSecret, found := os.LookupEnv("ZENDESK_SECRET")
 	if found {

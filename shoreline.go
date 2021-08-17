@@ -44,7 +44,7 @@ func main() {
 
 	var mongoConfig mongo.Config
 
-	servicePort, _ := os.LookupEnv("SHORELINE_PORT")
+	servicePort := os.Getenv("SHORELINE_PORT")
 	if servicePort == "" {
 		servicePort = "9107"
 	}
