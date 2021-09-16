@@ -19,6 +19,7 @@ type (
 		ExpiresAt int64  `json:"-" bson:"expiresAt"`
 		CreatedAt int64  `json:"-" bson:"createdAt"`
 		Time      int64  `json:"-" bson:"time"`
+		Used      bool   `json:"-" bson:"used"`
 	}
 
 	TokenData struct {
@@ -32,6 +33,7 @@ type (
 	}
 
 	TokenConfig struct {
+		signAlgo     string
 		Secret       string
 		DurationSecs int64
 	}
@@ -94,7 +96,11 @@ func UnpackSessionTokenAndVerify(id string, secret string) (*TokenData, error) {
 	}, nil
 }
 
+// create and sign a token based on data and configuration
 func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, error) {
+	if config.signAlgo == "" {
+		config.signAlgo = "HS256"
+	}
 	if data.UserId == "" {
 		return nil, SessionToken_error_no_userid
 	}
@@ -111,7 +117,7 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 	createdAt := now.Unix()
 	expiresAt := now.Add(time.Duration(data.DurationSecs) * time.Second).Unix()
 
-	jwt_token := jwt.New(jwt.GetSigningMethod("HS256"))
+	jwt_token := jwt.New(jwt.GetSigningMethod(config.signAlgo))
 	claims := jwt_token.Claims.(jwt.MapClaims)
 	if data.IsServer {
 		claims["svr"] = "yes"
@@ -130,7 +136,7 @@ func CreateSessionToken(data *TokenData, config TokenConfig) (*SessionToken, err
 			claims["organization"] = "Patient"
 		}
 		claims["aud"] = "zendesk"
-	} else {
+	} else if data.Role != "" {
 		claims["role"] = data.Role
 	}
 	claims["usr"] = data.UserId
