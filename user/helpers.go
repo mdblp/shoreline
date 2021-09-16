@@ -239,12 +239,14 @@ func (a *Api) removeUserLoginInProgress(elem *list.Element) {
 	a.loginLimiter.mutex.Unlock()
 }
 
+// Create a session token used during the user session to refresh auth tokens
+// This token is persisted in the DB so it can be invalidated when the user logs out
 func CreateSessionTokenAndSave(ctx context.Context, data *token.TokenData, config token.TokenConfig, store Storage) (*token.SessionToken, error) {
 	sessionToken, err := token.CreateSessionToken(data, config)
 	if err != nil {
 		return nil, err
 	}
-
+	sessionToken.Used = false
 	err = store.AddToken(ctx, sessionToken)
 	if err != nil {
 		return nil, err

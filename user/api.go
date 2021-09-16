@@ -109,6 +109,7 @@ const (
 	TP_SERVER_NAME    = "x-tidepool-server-name"
 	TP_SERVER_SECRET  = "x-tidepool-server-secret"
 	TP_SESSION_TOKEN  = "x-tidepool-session-token"
+	TP_REFRESH_TOKEN  = "x-tidepool-refresh-token"
 	EXT_SESSION_TOKEN = "x-external-session-token"
 	// TP_TRACE_SESSION Session trace: uuid v4
 	TP_TRACE_SESSION      = "x-tidepool-trace-session"
@@ -744,7 +745,6 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
 		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)
-
 	} else {
 		// Login succeed:
 		// FIXME, YLP-1065
@@ -766,21 +766,41 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 			role = result.Roles[0]
 		}
 
-		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: role}
-		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
-		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store); err != nil {
+		if err := a.newSessionTokens(res, req, result); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
-
 		} else {
-			a.logAudit(req, tokenData, "Login")
-			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-			a.sendUser(res, result, false)
+			a.logAudit(req, &token.TokenData{UserId: user.Id, IsServer: false}, "Login")
 		}
-
 		if err := a.UpdateUserAfterSuccessfulLogin(req.Context(), result); err != nil {
 			a.logger.Printf("Failed to save success login status [%s] for user %#v", err.Error(), result)
 		}
 	}
+}
+
+// Create both auth and refresh tokens and send them to the user
+func (a *Api) newSessionTokens(res http.ResponseWriter, req *http.Request, user *User) error {
+	// TODO: replace this workaround, there should be only one role when the data is cleaned up
+	role := "patient"
+	if user.Roles != nil && len(user.Roles) > 0 {
+		role = user.Roles[0]
+	}
+	// Create and save a session token that will be used to refresh the auth token
+	if refreshToken, err := CreateSessionTokenAndSave(
+		req.Context(),
+		&token.TokenData{UserId: user.Id},
+		// TO Discuss: use a specific secret for the refresh token as there is no reason to share it with anybody
+		token.TokenConfig{DurationSecs: a.ApiConfig.UserSessionDurationSecs, Secret: a.ApiConfig.Secret},
+		a.Store); err != nil {
+		// Then Create the auth token that will be used to authenticate requests
+	} else if authToken, err := token.CreateSessionToken(
+		&token.TokenData{UserId: user.Id, Email: user.Username, Name: user.Username, Role: role},
+		token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}); err != nil {
+	} else {
+		res.Header().Set(TP_REFRESH_TOKEN, refreshToken.ID)
+		res.Header().Set(TP_SESSION_TOKEN, authToken.ID)
+		a.sendUser(res, user, false)
+	}
+	return nil
 }
 
 // @Summary Login server
@@ -868,47 +888,55 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Failure 401 {string} string ""
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
-	a.logger.Printf("refresh session with trace token %v", sanitizeSessionTrace(req))
-	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
-
-	if err != nil {
-		a.logger.Println(http.StatusUnauthorized, err.Error())
+	a.logger.Printf("refresh session with trace token %v", req.Header.Get(TP_TRACE_SESSION))
+	tokenRefreshId := sanitizeSessionToken(req)
+	if tokenRefreshId == "" {
+		a.logger.Println(http.StatusUnauthorized)
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	var user *User
 
-	// retrieve User in Db for having last information (role)
-	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
-	if errUser != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
-
-	} else if user == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
-	}
-
-	// Set Role
-	var role string
-	if user.Roles != nil && len(user.Roles) > 0 {
-		role = user.Roles[0]
-	}
-
-	//refresh token with update user information
-	newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: user.Id, IsServer: false, Role: role}
-	tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
-	if sessionToken, err := CreateSessionTokenAndSave(
-		req.Context(),
-		&newTokenData,
-		tokenConfig,
-		a.Store,
-	); err != nil {
-		a.logger.Println(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
-		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
+	// check the refresh/session token is present in the DB and not expired
+	if td, err := a.Store.FindTokenByID(req.Context(), tokenRefreshId); err != nil {
+		// TODO: check the error, return unauthorized if there is no token found, otherwise return 500 and log error
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
+		return
+	} else if td.ExpiresAt < time.Now().Unix() {
+		//session has expired, impossible to renew the token, Send more information?
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "refresh token has expired")
 		return
 	} else {
-		a.logAudit(req, td, "Refresh session token with last user information")
-		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-		sendModelAsRes(res, td)
-		return
+		// Force current refresh token expiration
+		td.Used = true
+		a.Store.AddToken(req.Context(), td)
+		// retrieve User in Db to get up to date information (role)
+		usr, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserID})
+		if errUser != nil {
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+			return
+		} else if usr == nil {
+			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
+			return
+		} else {
+			user = usr
+		}
+	}
+
+	// Start by removing the session token
+	/*
+		TO discuss: It may be interesting to keep the refresh token to check for its re-use (malicious user)
+					Rather than delete it, let's invalid it
+		if err := a.Store.RemoveTokenByID(req.Context(), tokenRefreshId); err != nil {
+			a.logger.Println("Refresh was unable to delete token", err.Error())
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
+			// And then create a new session token
+		} else */
+
+	if err := a.newSessionTokens(res, req, user); err != nil {
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
+	} else {
+		a.logAudit(req, &token.TokenData{UserId: user.Id, IsServer: false}, "RenewToken")
 	}
 }
 
@@ -984,6 +1012,8 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Success 200 {string} string ""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
+	// TO DISCUSS: As IS the route will respond with 200 OK if the token is not provided or not found in the DB
+	// This is ok and we don't really have a choice if we want to keep the route compatible with legacy clients
 	if id := sanitizeSessionToken(req); id != "" {
 		if err := a.Store.RemoveTokenByID(req.Context(), id); err != nil {
 			//silently fail but still log it
