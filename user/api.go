@@ -71,6 +71,8 @@ type (
 		LongTermsDuration int64  `json:"longTermDuration"`
 		// UserTokenDuration is the token duration for user token
 		UserTokenDurationSecs int64
+		// UserSessionDuration is the maximum duration during which a user token can be refreshed
+		UserSessionDurationSecs int64
 		// ServerTokenDuration is the token duration for server tokens
 		ServerTokenDurationSecs int64
 		//used for pw
@@ -156,6 +158,7 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 		BlockParallelLogin:          true,
 		LongTermsDuration:           30 * dayAsSecs,
 		UserTokenDurationSecs:       60 * 60,
+		UserSessionDurationSecs:     60 * 60 * 12,
 		ServerTokenDurationSecs:     dayAsSecs,
 		Salt:                        "ADihSEI7tOQQP9xfXMO9HfRpXKu1NpIJ",
 		ServerSecrets:               make(map[string]string),
@@ -234,13 +237,21 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 		config.LongTermsDuration = int64(intValue) * dayAsSecs
 	}
 
-	intValue, found, err = getIntFromEnvVar("USER_TOKEN_DURATION_SECS", 60, math.MaxInt32)
+	intValue, found, err = getIntFromEnvVar("USER_TOKEN_TTL_SECS", 60, math.MaxInt32)
 	if err != nil {
 		log.Fatal(err)
 	} else if found {
 		config.UserTokenDurationSecs = int64(intValue)
 	}
-	log.Printf("User token duration: %v", time.Duration(config.UserTokenDurationSecs)*time.Second)
+	log.Printf("Default user token duration: %v", time.Duration(config.UserTokenDurationSecs)*time.Second)
+
+	intValue, found, err = getIntFromEnvVar("USER_SESSION_DURATION_SECS", 60, math.MaxInt32)
+	if err != nil {
+		log.Fatal(err)
+	} else if found {
+		config.UserSessionDurationSecs = int64(intValue)
+	}
+	log.Printf("Refresh token duration: %v", time.Duration(config.UserSessionDurationSecs)*time.Second)
 
 	intValue, found, err = getIntFromEnvVar("SERVER_TOKEN_DURATION_SECS", 60, math.MaxInt32)
 	if err != nil {
