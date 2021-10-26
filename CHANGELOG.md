@@ -2,6 +2,9 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 1.8.2
+- YLP-1065: Automatically add the role "patient" for login requests coming from private api
+
 ## 1.8.1 - 2021-09-28
 ### Fixed
 - YLP-1026: Shoreline cannot start with 200 concurrent users
