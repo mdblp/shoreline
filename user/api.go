@@ -106,7 +106,8 @@ const (
 	TP_SESSION_TOKEN  = "x-tidepool-session-token"
 	EXT_SESSION_TOKEN = "x-external-session-token"
 	// TP_TRACE_SESSION Session trace: uuid v4
-	TP_TRACE_SESSION = "x-tidepool-trace-session"
+	TP_TRACE_SESSION      = "x-tidepool-trace-session"
+	HEADER_REQUEST_SOURCE = "X-Backloops-Source"
 
 	STATUS_NO_USR_DETAILS        = "No user details were given"
 	STATUS_INVALID_USER_DETAILS  = "Invalid user details were given"
@@ -672,7 +673,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Failure 400 {object} status.Status "message returned: \"Missing id and/or password\""
 // @Router /login [post]
 func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
-	requestSource := req.Header.Get("X-Backloops-Source")
+	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
 	user, password, err := unpackAuth(req.Header.Get("Authorization"))
 	if err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, err)
