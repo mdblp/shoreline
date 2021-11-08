@@ -107,7 +107,7 @@ const (
 	EXT_SESSION_TOKEN = "x-external-session-token"
 	// TP_TRACE_SESSION Session trace: uuid v4
 	TP_TRACE_SESSION      = "x-tidepool-trace-session"
-	HEADER_REQUEST_SOURCE = "X-Backloops-Source"
+	HEADER_REQUEST_SOURCE = "x-backloops-source"
 
 	STATUS_NO_USR_DETAILS        = "No user details were given"
 	STATUS_INVALID_USER_DETAILS  = "Invalid user details were given"
