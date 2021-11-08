@@ -3,7 +3,9 @@
 Shoreline is the module that manages user accounts and authentication.
 
 ## 1.8.2
-- YLP-1065: Automatically add the role "patient" for login requests coming from private api
+### Changed
+- YLP-1065: Automatically add the role "patient" for login requests coming from private api.
+- YLP-1057: Allow usage of all characters in passwords, including unicode and whitespace.
 
 ## 1.8.1 - 2021-09-28
 ### Fixed
