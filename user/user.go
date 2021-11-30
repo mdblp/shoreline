@@ -238,7 +238,7 @@ func (details *NewUserDetails) Validate() error {
 		return User_error_password_invalid
 	}
 
-	if details.Roles != nil {
+	if details.Roles != nil && len(details.Roles) > 0 {
 		// Should we reject when more than 1 role are provided?
 		for _, role := range details.Roles {
 			if !IsValidRole(role) {

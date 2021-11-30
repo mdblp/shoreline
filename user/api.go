@@ -720,6 +720,12 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 
 	} else {
 		// Login succeed:
+
+		// No role, silently set it to patient
+		if result.Roles == nil || len(result.Roles) == 0 {
+			result.Roles = []string{"patient"}
+		}
+
 		// FIXME, YLP-1065
 		if requestSource == "private" && result.Roles[0] != "patient" {
 			a.logger.Printf("Adding patient role to user %v", result.Id)
