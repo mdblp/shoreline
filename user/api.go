@@ -723,19 +723,24 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	} else {
 		// Login succeed:
 		// FIXME, YLP-1065
-		if requestSource == "private" && (len(result.Roles) == 0 || result.Roles[0] != "patient") {
-			a.logger.Printf("Adding patient role to user %v", result.Id)
+		role := "patient"
+		if len(result.Roles) == 0 {
+			// Default role to patient, if no role is found
+			// FIXME Dirty quirk
+			result.Roles = []string{"patient"}
+		}
+		if requestSource == "private" && !result.HasRole("patient") {
+			a.logger.Printf("Private route login: Adding patient role to user %v", result.Id)
 			// Let's add the role patient:
-			result.Roles = []string{"patient", result.Roles[0]}
+			result.Roles = append([]string{"patient"}, result.Roles...)
 			if err := a.Store.UpsertUser(req.Context(), result); err != nil {
 				a.logger.Printf("Login of a non patient user from our private endpoint. Error while adding the role patient: %s", err)
 			}
-		}
-		// FIXME: replace this workaround, we should support multi roles
-		role := "patient"
-		if len(result.Roles) > 0 {
+		} else if len(result.Roles) > 0 {
+			// FIXME: replace this workaround, we should support multi roles
 			role = result.Roles[0]
 		}
+
 		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: role}
 		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store); err != nil {

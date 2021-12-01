@@ -240,7 +240,12 @@ func (details *NewUserDetails) Validate(requestSource string) error {
 	}
 
 	if len(details.Roles) > 0 {
-		// Should we reject when more than 1 role are provided?
+		// TODO multiroles: should checks the compatibles roles:
+		// - 2 roles max (?)
+		// - patient is compatible with caregiver/hcp
+		// - hcp is compatible with patient
+		// - caregiver is compatible with patient
+		// - caregiver and hcp are incompatible
 		for _, role := range details.Roles {
 			if !IsValidRole(role) {
 				return User_error_roles_invalid
@@ -261,9 +266,8 @@ func ParseNewUserDetails(reader io.Reader) (*NewUserDetails, error) {
 	details := &NewUserDetails{}
 	if err := details.ExtractFromJSON(reader); err != nil {
 		return nil, err
-	} else {
-		return details, nil
 	}
+	return details, nil
 }
 
 func NewUser(details *NewUserDetails, salt string, requestSource string) (user *User, err error) {
