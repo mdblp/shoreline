@@ -57,7 +57,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	 * THE TESTS
 	 */
 	ctx := context.Background()
-	user, err := NewUser(original_user_detail, tests_fake_salt)
+	user, err := NewUser(original_user_detail, tests_fake_salt, "public")
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -157,7 +157,7 @@ func TestMongoStoreUserOperations(t *testing.T) {
 	}
 
 	//Find many By Email - user and userTwo have the same emails addresses
-	userTwo, err := NewUser(other_user_detail, tests_fake_salt)
+	userTwo, err := NewUser(other_user_detail, tests_fake_salt, "public")
 	if err != nil {
 		t.Fatalf("we could not create the user %v", err)
 	}
@@ -197,9 +197,9 @@ func TestMongoStore_FindUsersByRole(t *testing.T) {
 	 * THE TESTS
 	 */
 	user_one_detail.Roles = []string{"hcp"}
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
+	userOne, _ := NewUser(user_one_detail, tests_fake_salt, "public")
 
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	userTwo, _ := NewUser(user_two_detail, tests_fake_salt, "public")
 
 	if err := mc.UpsertUser(ctx, userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)
@@ -235,8 +235,8 @@ func TestMongoStore_FindUsersById(t *testing.T) {
 	/*
 	 * THE TESTS
 	 */
-	userOne, _ := NewUser(user_one_detail, tests_fake_salt)
-	userTwo, _ := NewUser(user_two_detail, tests_fake_salt)
+	userOne, _ := NewUser(user_one_detail, tests_fake_salt, "public")
+	userTwo, _ := NewUser(user_two_detail, tests_fake_salt, "public")
 
 	if err := mc.UpsertUser(ctx, userOne); err != nil {
 		t.Fatalf("we could not create the user %v", err)

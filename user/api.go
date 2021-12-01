@@ -392,14 +392,16 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
 // @Router /user [post]
 func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
+	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
+
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(300)))
 
 	if newUserDetails, err := ParseNewUserDetails(req.Body); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
-	} else if err := newUserDetails.Validate(); err != nil { // TODO: Fix this duplicate work!
+	} else if err := newUserDetails.Validate(requestSource); err != nil { // TODO: Fix this duplicate work!
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
-	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt); err != nil {
+	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt, requestSource); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
 	} else if existingUser, err := a.Store.FindUsers(req.Context(), newUser); err != nil {
 		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
@@ -720,14 +722,8 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 
 	} else {
 		// Login succeed:
-
-		// No role, silently set it to patient
-		if result.Roles == nil || len(result.Roles) == 0 {
-			result.Roles = []string{"patient"}
-		}
-
 		// FIXME, YLP-1065
-		if requestSource == "private" && result.Roles[0] != "patient" {
+		if requestSource == "private" && (len(result.Roles) == 0 || result.Roles[0] != "patient") {
 			a.logger.Printf("Adding patient role to user %v", result.Id)
 			// Let's add the role patient:
 			result.Roles = []string{"patient", result.Roles[0]}
@@ -737,7 +733,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		}
 		// FIXME: replace this workaround, we should support multi roles
 		role := "patient"
-		if result.Roles != nil && len(result.Roles) > 0 {
+		if len(result.Roles) > 0 {
 			role = result.Roles[0]
 		}
 		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: role}
