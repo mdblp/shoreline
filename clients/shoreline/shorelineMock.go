@@ -66,6 +66,12 @@ func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserDa
 	}
 }
 
+func (client *ShorelineMockClient) GetUnauthUsers(token string) ([]schema.UserData, error) {
+	return []schema.UserData{
+		{UserID: "randomId", Username: "From Mock", Emails: []string{"randomEmails"}, PasswordExists: false, Roles: []string{"patient"}, TermsAccepted: "false"},
+	}, nil
+}
+
 func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate schema.UserUpdate, token string) error {
 	return nil
 }
