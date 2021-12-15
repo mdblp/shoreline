@@ -3,8 +3,9 @@ package user
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
+
+	log "github.com/sirupsen/logrus"
 
 	goComMgo "github.com/mdblp/go-common/clients/mongo"
 	"github.com/mdblp/shoreline/token"

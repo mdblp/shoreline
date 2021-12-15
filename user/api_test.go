@@ -9,16 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/gorilla/mux"
 	"github.com/mdblp/go-common/clients/version"
@@ -73,7 +74,7 @@ var (
 	/*
 	 * expected path
 	 */
-	logger    = log.New(os.Stdout, USER_API_PREFIX, log.LstdFlags|log.Lshortfile)
+	logger, _ = test.NewNullLogger()
 	mockStore = NewMockStoreClient(FAKE_CONFIG.Salt, false, false)
 	shoreline = InitAPITest(FAKE_CONFIG, logger, mockStore)
 	/*
