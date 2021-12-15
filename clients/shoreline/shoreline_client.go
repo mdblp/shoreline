@@ -287,6 +287,14 @@ func extractUserData(r io.Reader) (*schema.UserData, error) {
 	return &ud, nil
 }
 
+func extractUsersData(r io.Reader) ([]schema.UserData, error) {
+	var ud []schema.UserData
+	if err := json.NewDecoder(r).Decode(&ud); err != nil {
+		return nil, err
+	}
+	return ud, nil
+}
+
 // Signs up a new platfrom user
 // Returns a UserData object if successful
 func (client *Client) Signup(username, password, email string) (*schema.UserData, error) {
@@ -398,6 +406,41 @@ func (client *Client) TokenProvide() string {
 	defer client.mut.Unlock()
 
 	return client.serverToken
+}
+
+// Get user details for the given user
+// In this case the userID could be the actual ID or an email address
+func (client *Client) GetUnauthUsers(token string) ([]schema.UserData, error) {
+	host, err := client.getHost()
+	if err != nil {
+		return nil, errors.New("No known user-api hosts.")
+	}
+
+	host.Path = path.Join(host.Path, "users?unauthenticated=false")
+
+	req, _ := http.NewRequest("GET", host.String(), nil)
+	req.Header.Add("x-tidepool-session-token", token)
+
+	res, err := client.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failure to get unauthenticated users")
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		ud, err := extractUsersData(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		return ud, nil
+	case http.StatusNoContent:
+		return []schema.UserData{}, nil
+	default:
+		return nil, &status.StatusError{
+			Status: status.NewStatusf(res.StatusCode, "Unknown response code from service[%s]", req.URL),
+		}
+	}
 }
 
 // Get user details for the given user

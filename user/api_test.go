@@ -364,6 +364,17 @@ func Test_GetUsers_Error_InvalidRole(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 400, "The role specified is invalid")
 }
 
+func Test_GetUsers_Error_InvalidAuthenticated(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/users?authenticated=invalid", headers)
+	T_ExpectErrorResponse(t, response, 400, "The authenticated query parameter must be true or false")
+}
+
 func Test_GetUsers_Error_NoQuery(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
@@ -452,6 +463,18 @@ func Test_GetUsers_Error_FindUsersByRoleError(t *testing.T) {
 	T_ExpectErrorResponse(t, response, 500, "Error finding user")
 }
 
+func Test_GetUsers_Error_FindUsersByAuthError(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUsersByAuthResponses = []FindUsersByAuthResponse{{[]*User{}, errors.New("ERROR")}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/users?authenticated=false", headers)
+	T_ExpectErrorResponse(t, response, 500, "Error finding user")
+}
+
 func Test_GetUsers_Error_FindUsersByRoleSuccess(t *testing.T) {
 	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
 	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
@@ -463,6 +486,19 @@ func Test_GetUsers_Error_FindUsersByRoleSuccess(t *testing.T) {
 	response := T_PerformRequestHeaders(t, "GET", "/users?role=hcp", headers)
 	successResponse := T_ExpectSuccessResponseWithJSONArray(t, response, 200)
 	T_ExpectEqualsArray(t, successResponse, []interface{}{map[string]interface{}{"userid": "0000000000", "passwordExists": false}, map[string]interface{}{"userid": "1111111111", "passwordExists": false}})
+}
+
+func Test_GetUsers_Error_FindUsersByAuthenticatedSuccess(t *testing.T) {
+	sessionToken := T_CreateSessionToken(t, "abcdef1234", true, TOKEN_DURATION)
+	responsableStore.FindTokenByIDResponses = []FindTokenByIDResponse{{sessionToken, nil}}
+	responsableStore.FindUsersByAuthResponses = []FindUsersByAuthResponse{{[]*User{{Id: "0000000004", TermsAccepted: "false"}, {Id: "1111111114", TermsAccepted: "false"}}, nil}}
+	defer T_ExpectResponsablesEmpty(t)
+
+	headers := http.Header{}
+	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
+	response := T_PerformRequestHeaders(t, "GET", "/users?authenticated=false", headers)
+	successResponse := T_ExpectSuccessResponseWithJSONArray(t, response, 200)
+	T_ExpectEqualsArray(t, successResponse, []interface{}{map[string]interface{}{"userid": "0000000004", "passwordExists": false}, map[string]interface{}{"userid": "1111111114", "passwordExists": false}})
 }
 
 ////////////////////////////////////////////////////////////////////////////////
