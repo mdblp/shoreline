@@ -495,7 +495,7 @@ func Test_GetUsers_Error_FindUsersByAuthenticatedSuccess(t *testing.T) {
 	headers.Add(TP_SESSION_TOKEN, sessionToken.ID)
 	response := T_PerformRequestHeaders(t, "GET", "/users?authenticated=false", headers)
 	successResponse := T_ExpectSuccessResponseWithJSONArray(t, response, 200)
-	T_ExpectEqualsArray(t, successResponse, []interface{}{map[string]interface{}{"userid": "0000000004", "passwordExists": false}, map[string]interface{}{"userid": "1111111114", "passwordExists": false}})
+	T_ExpectEqualsArray(t, successResponse, []interface{}{map[string]interface{}{"userid": "0000000004", "passwordExists": false, "termsAccepted":"false"}, map[string]interface{}{"userid": "1111111114", "passwordExists": false, "termsAccepted":"false"}})
 }
 
 ////////////////////////////////////////////////////////////////////////////////
