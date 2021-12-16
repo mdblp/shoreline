@@ -68,7 +68,7 @@ func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserDa
 
 func (client *ShorelineMockClient) GetUnverifiedUsers(token string) ([]schema.UserData, error) {
 	return []schema.UserData{
-		{UserID: "randomId", Username: "From Mock", Emails: []string{"randomEmails"}, PasswordExists: false, Roles: []string{"patient"}, TermsAccepted: "false"},
+		{UserID: "randomId", Username: "From Mock", Emails: []string{"randomEmails"}, PasswordExists: false, Roles: []string{"patient"}, EmailVerified: false},
 	}, nil
 }
 
