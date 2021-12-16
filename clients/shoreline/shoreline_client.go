@@ -408,22 +408,21 @@ func (client *Client) TokenProvide() string {
 	return client.serverToken
 }
 
-// Get user details for the given user
-// In this case the userID could be the actual ID or an email address
-func (client *Client) GetUnauthUsers(token string) ([]schema.UserData, error) {
+// Get users with unverified email
+func (client *Client) GetUnverifyUsers(token string) ([]schema.UserData, error) {
 	host, err := client.getHost()
 	if err != nil {
 		return nil, errors.New("No known user-api hosts.")
 	}
 
-	host.Path = path.Join(host.Path, "users?unauthenticated=false")
+	host.Path = path.Join(host.Path, "users?emailVerified=false")
 
 	req, _ := http.NewRequest("GET", host.String(), nil)
 	req.Header.Add("x-tidepool-session-token", token)
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failure to get unauthenticated users")
+		return nil, errors.Wrap(err, "Failure to get unverify users")
 	}
 	defer res.Body.Close()
 

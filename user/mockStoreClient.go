@@ -78,9 +78,9 @@ func (d MockStoreClient) FindUsersByRole(ctx context.Context, role string) (foun
 	return nil, nil
 }
 
-func (d MockStoreClient) FindUsersByAuth(ctx context.Context, auth bool) (found []*User, err error) {
+func (d MockStoreClient) FindUsersByEmailVerified(ctx context.Context, auth bool) (found []*User, err error) {
 	if d.doBad {
-		return found, errors.New("FindUsersByAuth failure")
+		return found, errors.New("FindUsersByEmailVerified failure")
 	}
 	return nil, nil
 }
