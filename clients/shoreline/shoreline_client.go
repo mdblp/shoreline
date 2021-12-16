@@ -409,7 +409,7 @@ func (client *Client) TokenProvide() string {
 }
 
 // Get users with unverified email
-func (client *Client) GetUnverifyUsers(token string) ([]schema.UserData, error) {
+func (client *Client) GetUnverifiedUsers(token string) ([]schema.UserData, error) {
 	host, err := client.getHost()
 	if err != nil {
 		return nil, errors.New("No known user-api hosts.")
