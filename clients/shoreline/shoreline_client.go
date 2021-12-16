@@ -422,7 +422,7 @@ func (client *Client) GetUnverifiedUsers(token string) ([]schema.UserData, error
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failure to get unverify users")
+		return nil, errors.Wrap(err, "Failure to get unverified users")
 	}
 	defer res.Body.Close()
 
