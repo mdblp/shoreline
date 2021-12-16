@@ -75,3 +75,7 @@ func (client *ShorelineMockClient) GetUnverifiedUsers(token string) ([]schema.Us
 func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate schema.UserUpdate, token string) error {
 	return nil
 }
+
+func (client *ShorelineMockClient) DeleteUser(userID string, token string) error {
+	return nil
+}
