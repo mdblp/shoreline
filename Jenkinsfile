@@ -12,13 +12,14 @@ pipeline {
                         env.GIT_COMMIT = "f".multiply(40)
                     }
                     env.RUN_ID = UUID.randomUUID().toString()
+                    env.buildImage = "docker.ci.diabeloop.eu/go-build:1.17"
                 }
             }
         }
         stage('Build ') {
             agent {
                 docker {
-                    image 'docker.ci.diabeloop.eu/go-build:1.15'
+                    image env.buildImage
                 }
             }
             steps {
@@ -32,7 +33,7 @@ pipeline {
                 echo 'start mongo to serve as a testing db'
                 sh 'docker network create shorelinetest${RUN_ID} && docker run --rm -d --net=shorelinetest${RUN_ID} --name=mongo4shoreline${RUN_ID} mongo:4.2'
                 script {
-                    docker.image('docker.ci.diabeloop.eu/go-build:1.15').inside("--net=shorelinetest${RUN_ID}") {
+                    docker.image(env.buildImage).inside("--net=shorelinetest${RUN_ID}") {
                         sh "TIDEPOOL_STORE_ADDRESSES=mongo4shoreline${RUN_ID}:27017  TIDEPOOL_STORE_DATABASE=shoreline_test $WORKSPACE/test.sh"
                     }
                 }
