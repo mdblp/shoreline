@@ -112,36 +112,36 @@ const (
 	TP_TRACE_SESSION      = "x-tidepool-trace-session"
 	HEADER_REQUEST_SOURCE = "x-backloops-source"
 
-	STATUS_NO_USR_DETAILS          = "No user details were given"
-	STATUS_INVALID_USER_DETAILS    = "Invalid user details were given"
-	STATUS_USER_NOT_FOUND          = "User not found"
-	STATUS_ERR_FINDING_USR         = "Error finding user"
-	STATUS_ERR_CREATING_USR        = "Error creating the user"
-	STATUS_ERR_UPDATING_USR        = "Error updating user"
-	STATUS_USR_ALREADY_EXISTS      = "User already exists"
-	STATUS_ERR_GENERATING_TOKEN    = "Error generating the token"
-	STATUS_ERR_UPDATING_TOKEN      = "Error updating token"
-	STATUS_MISSING_USR_DETAILS     = "Not all required details were given"
-	STATUS_ERROR_UPDATING_PW       = "Error updating password"
-	STATUS_MISSING_ID_PW           = "Missing id and/or password"
-	STATUS_NO_MATCH                = "No user matched the given details"
-	STATUS_NOT_VERIFIED            = "The user hasn't verified this account yet"
-	STATUS_NO_TOKEN_MATCH          = "No token matched the given details"
-	STATUS_PW_WRONG                = "Wrong password"
-	STATUS_ERR_SENDING_EMAIL       = "Error sending email"
-	STATUS_NO_TOKEN                = "No x-tidepool-session-token was found"
-	STATUS_SERVER_TOKEN_REQUIRED   = "A server token is required"
-	STATUS_AUTH_HEADER_REQUIRED    = "Authorization header is required"
-	STATUS_AUTH_HEADER_INVLAID     = "Authorization header is invalid"
-	STATUS_GETSTATUS_ERR           = "Error checking service status"
-	STATUS_UNAUTHORIZED            = "Not authorized for requested operation"
-	STATUS_NO_QUERY                = "A query must be specified"
-	STATUS_PARAMETER_UNKNOWN       = "Unknown query parameter"
-	STATUS_ONE_QUERY_PARAM         = "Only one query parameter is allowed"
-	STATUS_INVALID_ROLE            = "The role specified is invalid"
-	STATUS_INVALID_AUTH_BOOL_PARAM = "The authenticated query parameter must be true or false"
-	STATUS_OK                      = "OK"
-	STATUS_NO_EXPECTED_PWD         = "No expected password is found"
+	STATUS_NO_USR_DETAILS                 = "No user details were given"
+	STATUS_INVALID_USER_DETAILS           = "Invalid user details were given"
+	STATUS_USER_NOT_FOUND                 = "User not found"
+	STATUS_ERR_FINDING_USR                = "Error finding user"
+	STATUS_ERR_CREATING_USR               = "Error creating the user"
+	STATUS_ERR_UPDATING_USR               = "Error updating user"
+	STATUS_USR_ALREADY_EXISTS             = "User already exists"
+	STATUS_ERR_GENERATING_TOKEN           = "Error generating the token"
+	STATUS_ERR_UPDATING_TOKEN             = "Error updating token"
+	STATUS_MISSING_USR_DETAILS            = "Not all required details were given"
+	STATUS_ERROR_UPDATING_PW              = "Error updating password"
+	STATUS_MISSING_ID_PW                  = "Missing id and/or password"
+	STATUS_NO_MATCH                       = "No user matched the given details"
+	STATUS_NOT_VERIFIED                   = "The user hasn't verified this account yet"
+	STATUS_NO_TOKEN_MATCH                 = "No token matched the given details"
+	STATUS_PW_WRONG                       = "Wrong password"
+	STATUS_ERR_SENDING_EMAIL              = "Error sending email"
+	STATUS_NO_TOKEN                       = "No x-tidepool-session-token was found"
+	STATUS_SERVER_TOKEN_REQUIRED          = "A server token is required"
+	STATUS_AUTH_HEADER_REQUIRED           = "Authorization header is required"
+	STATUS_AUTH_HEADER_INVLAID            = "Authorization header is invalid"
+	STATUS_GETSTATUS_ERR                  = "Error checking service status"
+	STATUS_UNAUTHORIZED                   = "Not authorized for requested operation"
+	STATUS_NO_QUERY                       = "A query must be specified"
+	STATUS_PARAMETER_UNKNOWN              = "Unknown query parameter"
+	STATUS_ONE_QUERY_PARAM                = "Only one query parameter is allowed"
+	STATUS_INVALID_ROLE                   = "The role specified is invalid"
+	STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM = "The emailVerified query parameter must be a boolean"
+	STATUS_OK                             = "OK"
+	STATUS_NO_EXPECTED_PWD                = "No expected password is found"
 )
 
 // NewConfigFromEnv create the configuration from environnement variables
@@ -341,6 +341,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @Produce  json
 // @Param role query string false "Role" Enums(clinic)
 // @Param id query string false "List of UserId separated by ,"
+// @Param emailVerified query string false "Filter users on emailVerified"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -351,17 +352,18 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
-
+		
 	} else if !tokenData.IsServer {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
 
 	} else if len(req.URL.Query()) == 0 {
 		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
+
 	} else if role := sanitizeRequestParam(req, "role"); role != "" && !IsValidRole(role) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_ROLE)
 
-	} else if authenticated := sanitizeRequestParam(req,"authenticated"); authenticated != "" && authenticated != "false" && authenticated != "true" {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_AUTH_BOOL_PARAM)
+	} else if emailVerified :=sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
 
 	} else if userIds := strings.Split(sanitizeRequestParam(req, "id"), ","); len(userIds[0]) > 0 && role != "" {
 		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
@@ -369,9 +371,9 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	} else {
 		var users []*User
 		switch {
-		case authenticated != "":
-			auth, _ := strconv.ParseBool(authenticated)
-			if users, err = a.Store.FindUsersByAuth(req.Context(), auth); err != nil {
+		case emailVerified != "":
+			emailVerif, _ := strconv.ParseBool(emailVerified)
+			if users, err = a.Store.FindUsersByEmailVerified(req.Context(), emailVerif); err != nil {
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
 			}
 		case role != "":
