@@ -341,7 +341,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @Produce  json
 // @Param role query string false "Role" Enums(clinic)
 // @Param id query string false "List of UserId separated by ,"
-// @Param emailVerified query string false "Filter users on emailVerified"
+// @Param emailVerified query boolean false "Filter users on emailVerified"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -359,16 +359,18 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	} else if len(req.URL.Query()) == 0 {
 		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
 
+	// we do not authorize more than one query param
+	} else if len(req.URL.Query()) > 1 {
+		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
+
 	} else if role := sanitizeRequestParam(req, "role"); role != "" && !IsValidRole(role) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_ROLE)
 
 	} else if emailVerified :=sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
 
-	} else if userIds := strings.Split(sanitizeRequestParam(req, "id"), ","); len(req.URL.Query()) > 1 {
-		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
-
 	} else {
+		userIds := strings.Split(req.URL.Query().Get("id"), ",")
 		var users []*User
 		switch {
 		case emailVerified != "":

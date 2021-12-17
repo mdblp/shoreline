@@ -173,7 +173,7 @@ func IsValidRole(role string) bool {
 
 func IsValidBoolean(val string) bool {
 	_, err := strconv.ParseBool(val)
-	return  err == nil
+	return err == nil
 }
 
 func IsValidDate(date string) bool {
