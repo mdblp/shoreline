@@ -409,7 +409,7 @@ func (client *Client) TokenProvide() string {
 }
 
 // Get users with unverified email
-func (client *Client) GetUnverifiedUsers(token string) ([]schema.UserData, error) {
+func (client *Client) GetUnverifiedUsers() ([]schema.UserData, error) {
 	host, err := client.getHost()
 	if err != nil {
 		return nil, errors.New("No known user-api hosts.")
@@ -418,7 +418,7 @@ func (client *Client) GetUnverifiedUsers(token string) ([]schema.UserData, error
 	host.Path = path.Join(host.Path, "users?emailVerified=false")
 
 	req, _ := http.NewRequest("GET", host.String(), nil)
-	req.Header.Add("x-tidepool-session-token", token)
+	req.Header.Add("x-tidepool-session-token", client.serverToken)
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
