@@ -352,7 +352,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
-		
+
 	} else if !tokenData.IsServer {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
 
@@ -365,7 +365,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	} else if emailVerified :=sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
 
-	} else if userIds := strings.Split(sanitizeRequestParam(req, "id"), ","); len(userIds[0]) > 0 && role != "" {
+	} else if userIds := strings.Split(sanitizeRequestParam(req, "id"), ","); len(req.URL.Query()) > 1 {
 		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
 
 	} else {
