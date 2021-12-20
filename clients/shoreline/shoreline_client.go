@@ -30,6 +30,8 @@ type (
 		TokenProvide() string
 		GetUser(userID, token string) (*schema.UserData, error)
 		UpdateUser(userID string, userUpdate schema.UserUpdate, token string) error
+		GetUnverifiedUsers() ([]schema.UserData, error)
+		DeleteUser(userID string) error
 	}
 
 	Client struct {
