@@ -370,7 +370,7 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
 
 	} else {
-		userIds := strings.Split(req.URL.Query().Get("id"), ",")
+		userIds := strings.Split(sanitizeRequestParam(req, "id"), ",")
 		var users []*User
 		switch {
 		case emailVerified != "":
