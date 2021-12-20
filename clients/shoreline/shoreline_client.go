@@ -518,7 +518,7 @@ func (client *Client) UpdateUser(userID string, userUpdate schema.UserUpdate, to
 }
 
 // Delete user
-func (client *Client) DeleteUser(userID string, token string) error {
+func (client *Client) DeleteUser(userID string) error {
 	host, err := client.getHost()
 	if err != nil {
 		return errors.New("No known user-api hosts.")
@@ -527,7 +527,7 @@ func (client *Client) DeleteUser(userID string, token string) error {
 	host.Path = path.Join(host.Path, "user", userID)
 
 	req, _ := http.NewRequest("DELETE", host.String(), nil)
-	req.Header.Add("x-tidepool-session-token", token)
+	req.Header.Add("x-tidepool-session-token", client.serverToken)
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
