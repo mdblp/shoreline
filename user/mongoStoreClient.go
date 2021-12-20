@@ -63,10 +63,10 @@ func (c *Client) FindUser(ctx context.Context, user *User) (result *User, err er
 
 func (c *Client) findUsers(ctx context.Context, filter interface{}, noResultMessage string) (results []*User, err error) {
 	cursor, err := mgoUsersCollection(c).Find(ctx, filter)
-	defer cursor.Close(ctx)
 	if err != nil {
 		return results, err
 	}
+	defer cursor.Close(ctx)
 	err = cursor.All(ctx, &results)
 	if err != nil {
 		return results, err
