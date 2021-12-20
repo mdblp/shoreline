@@ -96,6 +96,7 @@ func ExtractString(data map[string]interface{}, key string) (*string, bool) {
 	} else if extractedString, ok := raw.(string); !ok {
 		return nil, false
 	} else {
+		extractedString = sanitize(extractedString)
 		return &extractedString, true
 	}
 }
@@ -123,6 +124,7 @@ func ExtractStringArray(data map[string]interface{}, key string) ([]string, bool
 			if extractedString, ok := raw.(string); !ok {
 				return nil, false
 			} else {
+				extractedString = sanitize(extractedString)
 				extractedStringArray = append(extractedStringArray, extractedString)
 			}
 		}
