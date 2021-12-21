@@ -50,10 +50,6 @@ func (client *ShorelineMockClient) CheckToken(tkn string) *token.TokenData {
 	return &token.TokenData{UserId: client.UserID, IsServer: client.IsServer}
 }
 
-func (client *ShorelineMockClient) TokenProvide() string {
-	return client.ServerToken
-}
-
 func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserData, error) {
 	if userID == "NotFound" {
 		return nil, nil
@@ -72,7 +68,12 @@ func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate schema.U
 	return nil
 }
 
-//TODO: refactor methods above to use testify like bellow 
+//TODO: refactor methods above to use testify like bellow
+
+func (client *ShorelineMockClient) TokenProvide() string {
+	args := client.Called()
+	return args.Get(0).(string)
+}
 
 func (client *ShorelineMockClient) GetUnverifiedUsers() ([]schema.UserData, error) {
 	args := client.Called()
