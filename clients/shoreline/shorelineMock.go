@@ -6,9 +6,11 @@ import (
 
 	"github.com/mdblp/shoreline/schema"
 	"github.com/mdblp/shoreline/token"
+	"github.com/stretchr/testify/mock"
 )
 
 type ShorelineMockClient struct {
+	mock.Mock
 	ServerToken  string
 	Unauthorized bool
 	UserID       string
@@ -67,5 +69,17 @@ func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserDa
 }
 
 func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate schema.UserUpdate, token string) error {
+	return nil
+}
+
+//TODO: refactor methods above to use testify like bellow 
+
+func (client *ShorelineMockClient) GetUnverifiedUsers() ([]schema.UserData, error) {
+	args := client.Called()
+	return args.Get(0).([]schema.UserData), args.Error(1)
+}
+
+func (client *ShorelineMockClient) DeleteUser(userId string) error {
+	client.Called(userId)
 	return nil
 }
