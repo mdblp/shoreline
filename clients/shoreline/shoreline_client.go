@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/mdblp/go-common/jepson"
 	"github.com/mdblp/shoreline/schema"
 	"github.com/mdblp/shoreline/token"
+	log "github.com/sirupsen/logrus"
 )
 
 type (
@@ -414,17 +414,20 @@ func (client *Client) TokenProvide() string {
 func (client *Client) GetUnverifiedUsers() ([]schema.UserData, error) {
 	host, err := client.getHost()
 	if err != nil {
-		return nil, errors.New("No known user-api hosts.")
+		return nil, errors.New("no known user-api hosts.")
 	}
 
-	host.Path = path.Join(host.Path, "users?emailVerified=false")
+	host.Path = path.Join(host.Path, "users")
+	q := host.Query()
+	q.Add("emailVerified", "false")
+	host.RawQuery = q.Encode()
 
 	req, _ := http.NewRequest("GET", host.String(), nil)
 	req.Header.Add("x-tidepool-session-token", client.serverToken)
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failure to get unverified users")
+		return nil, errors.Wrap(err, "failure to get unverified users")
 	}
 	defer res.Body.Close()
 
@@ -439,7 +442,7 @@ func (client *Client) GetUnverifiedUsers() ([]schema.UserData, error) {
 		return []schema.UserData{}, nil
 	default:
 		return nil, &status.StatusError{
-			Status: status.NewStatusf(res.StatusCode, "Unknown response code from service[%s]", req.URL),
+			Status: status.NewStatusf(res.StatusCode, "unknown response code from service[%s]", req.URL),
 		}
 	}
 }
@@ -538,7 +541,7 @@ func (client *Client) DeleteUser(userID string) error {
 	defer res.Body.Close()
 
 	switch res.StatusCode {
-	case http.StatusOK:
+	case http.StatusAccepted:
 		return nil
 	default:
 		return &status.StatusError{

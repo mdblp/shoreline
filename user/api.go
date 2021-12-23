@@ -359,14 +359,14 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 	} else if len(req.URL.Query()) == 0 {
 		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
 
-	// we do not authorize more than one query param
+		// we do not authorize more than one query param
 	} else if len(req.URL.Query()) > 1 {
 		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
 
 	} else if role := sanitizeRequestParam(req, "role"); role != "" && !IsValidRole(role) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_ROLE)
 
-	} else if emailVerified :=sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
+	} else if emailVerified := sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
 
 	} else {
@@ -621,7 +621,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Accept  json
 // @Produce  json
 // @Param userid path int true "user id for server request, from token for personal request" optional
-// @Param password body string true "password"
+// @Param password body string true "password for personal request"
 // @Security TidepoolAuth
 // @Success 202 "User deleted"
 // @Failure 500 {string} string ""
@@ -648,7 +648,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 
 	pw := getGivenDetail(req)["password"]
 
-	if id != "" && pw != "" {
+	if id != "" && (td.IsServer || pw != "") {
 
 		var err error
 		toDelete := &User{Id: id}
