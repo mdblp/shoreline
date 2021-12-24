@@ -18,7 +18,7 @@ func TestMock(t *testing.T) {
 
 	const tokenMock = "this is a token"
 
-	client := NewMock()
+	client := NewMock(tokenMock)
 
 	if err := client.Start(); err != nil {
 		t.Errorf("Failed start with error[%v]", err)
