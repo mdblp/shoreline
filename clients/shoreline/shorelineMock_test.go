@@ -18,14 +18,10 @@ func TestMock(t *testing.T) {
 
 	const tokenMock = "this is a token"
 
-	client := NewMock(tokenMock)
+	client := NewMock()
 
 	if err := client.Start(); err != nil {
 		t.Errorf("Failed start with error[%v]", err)
-	}
-
-	if tok := client.TokenProvide(); tok != tokenMock {
-		t.Errorf("Unexpected token[%s]", tok)
 	}
 
 	if usr, token, err := client.Login("billy", "howdy"); err != nil {

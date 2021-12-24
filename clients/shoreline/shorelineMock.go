@@ -11,15 +11,13 @@ import (
 
 type ShorelineMockClient struct {
 	mock.Mock
-	ServerToken  string
 	Unauthorized bool
 	UserID       string
 	IsServer     bool
 }
 
-func NewMock(token string) *ShorelineMockClient {
+func NewMock() *ShorelineMockClient {
 	return &ShorelineMockClient{
-		ServerToken:  token,
 		Unauthorized: false,
 		UserID:       "123.456.789",
 		IsServer:     true,
