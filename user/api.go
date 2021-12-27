@@ -653,7 +653,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 		var err error
 		toDelete := &User{Id: id}
 
-		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); err == nil {
+		if err = toDelete.HashPassword(pw, a.ApiConfig.Salt); td.IsServer || err == nil {
 			if err = a.Store.RemoveUser(req.Context(), toDelete); err == nil {
 
 				a.logAudit(req, td, "DeleteUser")

@@ -1080,6 +1080,23 @@ func TestDeleteUser_StatusForbidden_WhenNoPw(t *testing.T) {
 	}
 }
 
+func TestDeleteUser_StatusOk_WhenNoPw_ButSrvToken(t *testing.T) {
+	params := map[string]string{
+		"userid": USR.Id,
+	}
+	request, _ := http.NewRequest("DELETE", "/", nil)
+	request.Header.Set(TP_SESSION_TOKEN, SRVR_TOKEN.ID)
+	response := httptest.NewRecorder()
+
+	shoreline.SetHandlers("", rtr)
+
+	shoreline.DeleteUser(response, request, params)
+
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("Non-expected status code %v:\n\tbody: %v", http.StatusAccepted, response.Code)
+	}
+}
+
 func TestDeleteUser_StatusForbidden_WhenEmptyPw(t *testing.T) {
 
 	var jsonData = []byte(`{"password": ""}`)
