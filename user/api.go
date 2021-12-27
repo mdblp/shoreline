@@ -339,9 +339,9 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @ID shoreline-user-api-getusers
 // @Accept  json
 // @Produce  json
-// @Param role query string false "Role" Enums(clinic)
-// @Param id query string false "List of UserId separated by ,"
-// @Param emailVerified query boolean false "Filter users on emailVerified"
+// @Param role query string false "Role. Exactly one query parameter is required in role, id, emailVerified" Enums(clinic)
+// @Param id query string false "List of UserId separated by ,. Exactly one query parameter is required in role, id, emailVerified"
+// @Param emailVerified query boolean false "Filter users on emailVerified. Exactly one query parameter is required in role, id, emailVerified"
 // @Security TidepoolAuth
 // @Success 200 {array} user.User
 // @Failure 500 {object} status.Status "message returned:\"Error finding user\" "
@@ -621,7 +621,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Accept  json
 // @Produce  json
 // @Param userid path int true "user id for server request, from token for personal request" optional
-// @Param password body string true "password for personal request"
+// @Param password body string false "password mandatory for personal request"
 // @Security TidepoolAuth
 // @Success 202 "User deleted"
 // @Failure 500 {string} string ""
