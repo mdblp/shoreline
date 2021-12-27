@@ -2,13 +2,13 @@
 
 Shoreline is the module that manages user accounts and authentication.
 ## 1.8.4 - 2021-12-15
-### Engineering
-- YLP-957 Migrate shoreline to logrus
 
 ## 1.8.4 - 2021-12-20
 ### Added
 - YLP-1132 Implement GET users not authenticated in shoreline
 - YLP-1134 Add DELETE user in shoreline client
+### Engineering
+- YLP-957 Migrate shoreline to logrus
 
 ## 1.8.3
 ### Fixed
