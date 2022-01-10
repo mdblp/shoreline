@@ -509,7 +509,7 @@ func Test_NewUser_Valid(t *testing.T) {
 	if user.Username != *details.Username || !reflect.DeepEqual(user.Emails, details.Emails) {
 		t.Fatalf("Fields do not match on success")
 	}
-	if !user.PasswordsMatch(*details.Password, salt) {
+	if !user.PasswordsMatch(*details.Password, salt, nil) {
 		t.Fatalf("Password does not match on success")
 	}
 	if !reflect.DeepEqual(details.Roles, []string{"hcp"}) {
@@ -1152,7 +1152,7 @@ func Test_User_PasswordsMatch_Match(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if !user.PasswordsMatch("3th3Hardw0y", salt) {
+	if !user.PasswordsMatch("3th3Hardw0y", salt, nil) {
 		t.Fatalf("PasswordsMatch returned false when passwords match")
 	}
 }
@@ -1164,7 +1164,7 @@ func Test_User_PasswordsMatch_NoMatch_Case(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("3TH3HARDW0Y", salt) {
+	if user.PasswordsMatch("3TH3HARDW0Y", salt, nil) {
 		t.Fatalf("PasswordsMatch returned true when passwords do not match")
 	}
 }
@@ -1172,7 +1172,7 @@ func Test_User_PasswordsMatch_NoMatch_Case(t *testing.T) {
 func Test_User_PasswordsMatch_NoMatch_MissingUserPassword(t *testing.T) {
 	user := &User{Id: "1234567890"}
 	salt := "abc"
-	if user.PasswordsMatch("3th3Hardw0y", salt) {
+	if user.PasswordsMatch("3th3Hardw0y", salt, nil) {
 		t.Fatalf("PasswordsMatch returned true when missing salt")
 	}
 }
@@ -1184,7 +1184,7 @@ func Test_User_PasswordsMatch_NoMatch_MissingQueryPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("", salt) {
+	if user.PasswordsMatch("", salt, nil) {
 		t.Fatalf("PasswordsMatch returned true when missing query password")
 	}
 }
@@ -1196,7 +1196,7 @@ func Test_User_PasswordsMatch_NoMatch_MissingSalt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("3th3Hardw0y", "") {
+	if user.PasswordsMatch("3th3Hardw0y", "", nil) {
 		t.Fatalf("PasswordsMatch returned true when missing salt")
 	}
 }

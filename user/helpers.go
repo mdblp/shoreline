@@ -135,7 +135,7 @@ func sendModelAsResWithStatus(res http.ResponseWriter, model interface{}, status
 	res.WriteHeader(statusCode)
 
 	if jsonDetails, err := json.Marshal(model); err != nil {
-		log.Println(USER_API_PREFIX, err.Error())
+		log.Error(USER_API_PREFIX, err.Error())
 	} else {
 		res.Write(jsonDetails)
 	}
@@ -159,7 +159,7 @@ func (a *Api) logAudit(req *http.Request, tokenData *token.TokenData, format str
 	}
 
 	s := fmt.Sprintf(format, args...)
-	a.auditLogger.Printf("%s%s", prefix, s)
+	a.auditLogger.Infof("%s%s", prefix, s)
 }
 
 func (a *Api) sendUser(res http.ResponseWriter, user *User, isServerRequest bool) {

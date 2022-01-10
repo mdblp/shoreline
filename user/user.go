@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"regexp"
 	"strconv"
@@ -554,12 +555,13 @@ func (u *User) HashPassword(pw, salt string) error {
 	}
 }
 
-func (u *User) PasswordsMatch(pw, salt string) bool {
+func (u *User) PasswordsMatch(pw, salt string, log *log.Logger) bool {
 	if u.PwHash == "" || pw == "" {
 		return false
 	} else if pwMatch, err := GeneratePasswordHash(u.Id, pw, salt); err != nil {
 		return false
 	} else {
+		log.Debugf("user pw hash: %s vs calculated: %s", u.PwHash, pwMatch)
 		return u.PwHash == pwMatch
 	}
 }

@@ -52,7 +52,7 @@ func main() {
 		logLevel = log.WarnLevel
 	}
 	logger.SetLevel(logLevel)
-	logger.Printf("Starting shoreline service %v\n", version.GetVersion().String())
+	logger.Infof("Starting shoreline service %v\n", version.GetVersion().String())
 
 	auditLogger := log.New()
 	auditLogger.Out = os.Stdout
@@ -91,13 +91,13 @@ func main() {
 	storage.Start()
 
 	userapi := user.New(shorelineConfig, logger, storage, auditLogger)
-	logger.Print("Installing handlers")
+	logger.Debug("Installing handlers")
 	userapi.SetHandlers("", rtr)
 
 	/*
 	 * Serve it up and publish
 	 */
-	logger.Printf("Creating http server on 0.0.0.0:%s", servicePort)
+	logger.Infof("Creating http server on 0.0.0.0:%s", servicePort)
 	srv := &http.Server{
 		Addr:    ":" + servicePort,
 		Handler: rtr,
@@ -116,7 +116,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
@@ -126,5 +126,5 @@ func main() {
 		logger.Fatal("Server forced to shutdown:", err)
 	}
 
-	logger.Println("Server exiting")
+	logger.Info("Server exited")
 }
