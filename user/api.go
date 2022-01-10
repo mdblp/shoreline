@@ -797,8 +797,8 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 // @Router /serverlogin [post]
 func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	// which server is knocking at the door and what password is it using to enter?
-	server, pw := req.Header.Get(TP_SERVER_NAME), req.Header.Get(TP_SERVER_SECRET)
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a server login request for serveur: %s", server)
+	server, pw := sanitizeRequestHeader(req, TP_SERVER_NAME), req.Header.Get(TP_SERVER_SECRET)
+	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a server login request for server: %s", server)
 	// the expected secret is the secret that the requesting server is supposed to give to be delivered the token
 	expectedSecret := ""
 
