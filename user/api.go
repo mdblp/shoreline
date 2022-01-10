@@ -411,10 +411,9 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(300)))
-	newUserDetails, err := ParseNewUserDetails(req.Body);
-	a.logger.Infof("processing a creation request for username: %s", *newUserDetails.Username)
+	a.logger.Infof("processing a creation request")
 
-	if err != nil {
+	if newUserDetails, err := ParseNewUserDetails(req.Body); err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
 	} else if err := newUserDetails.Validate(requestSource); err != nil { // TODO: Fix this duplicate work!
 		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
@@ -636,13 +635,13 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a deletion request for userid: %s", td.UserId)
-
+	
 	if err != nil {
 		a.logger.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a deletion request for userid: %s", td.UserId)
 
 	var id string
 	if td.IsServer {
@@ -699,7 +698,6 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
 	user, password, err := unpackAuth(sanitizeRequestHeader(req, "Authorization"))
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a login request for username: %s", user.Username)
 	if err != nil {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, err)
 		return
@@ -708,7 +706,8 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
 		return
 	}
-
+	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a login request for username: %s", user.Username)
+	
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)))
 
@@ -869,13 +868,13 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a refresh session request for userid: %s", td.UserId)
-
+	
 	if err != nil {
 		a.logger.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a refresh session request for userid: %s", td.UserId)
 
 	// retrieve User in Db for having last information (role)
 	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})

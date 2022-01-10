@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func Test_ExtractBool_Missing(t *testing.T) {
@@ -495,6 +496,7 @@ func Test_NewUser_MissingSalt(t *testing.T) {
 }
 
 func Test_NewUser_Valid(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	username := "a@z.co"
 	password := "12345678"
 	details := &NewUserDetails{Username: &username, Emails: []string{"b@y.co", "c@x.co"}, Password: &password, Roles: []string{"hcp"}}
@@ -509,7 +511,7 @@ func Test_NewUser_Valid(t *testing.T) {
 	if user.Username != *details.Username || !reflect.DeepEqual(user.Emails, details.Emails) {
 		t.Fatalf("Fields do not match on success")
 	}
-	if !user.PasswordsMatch(*details.Password, salt, nil) {
+	if !user.PasswordsMatch(*details.Password, salt, logger) {
 		t.Fatalf("Password does not match on success")
 	}
 	if !reflect.DeepEqual(details.Roles, []string{"hcp"}) {
@@ -521,6 +523,7 @@ func Test_NewUser_Valid(t *testing.T) {
 	if user.TermsAccepted != "" || user.EmailVerified || len(user.Private) > 0 {
 		t.Fatalf("Found fields that not should be present on success")
 	}
+	hook.Reset()
 }
 
 func Test_NewCustodialUserDetails_ExtractFromJSON_InvalidJSON(t *testing.T) {
@@ -1146,59 +1149,69 @@ func Test_User_HashPassword_WithEmptyParams(t *testing.T) {
 }
 
 func Test_User_PasswordsMatch_Match(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	user := &User{Id: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if !user.PasswordsMatch("3th3Hardw0y", salt, nil) {
+	if !user.PasswordsMatch("3th3Hardw0y", salt, logger) {
 		t.Fatalf("PasswordsMatch returned false when passwords match")
 	}
+	hook.Reset()
 }
 
 func Test_User_PasswordsMatch_NoMatch_Case(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	user := &User{Id: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("3TH3HARDW0Y", salt, nil) {
+	if user.PasswordsMatch("3TH3HARDW0Y", salt, logger) {
 		t.Fatalf("PasswordsMatch returned true when passwords do not match")
 	}
+	hook.Reset()
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingUserPassword(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	user := &User{Id: "1234567890"}
 	salt := "abc"
-	if user.PasswordsMatch("3th3Hardw0y", salt, nil) {
+	if user.PasswordsMatch("3th3Hardw0y", salt, logger) {
 		t.Fatalf("PasswordsMatch returned true when missing salt")
 	}
+	hook.Reset()
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingQueryPassword(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	user := &User{Id: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("", salt, nil) {
+	if user.PasswordsMatch("", salt, logger) {
 		t.Fatalf("PasswordsMatch returned true when missing query password")
 	}
+	hook.Reset()
 }
 
 func Test_User_PasswordsMatch_NoMatch_MissingSalt(t *testing.T) {
+	logger, hook := test.NewNullLogger()
 	user := &User{Id: "1234567890"}
 	salt := "abc"
 	err := user.HashPassword("3th3Hardw0y", salt)
 	if err != nil {
 		t.Fatalf("Failure hashing password")
 	}
-	if user.PasswordsMatch("3th3Hardw0y", "", nil) {
+	if user.PasswordsMatch("3th3Hardw0y", "", logger) {
 		t.Fatalf("PasswordsMatch returned true when missing salt")
 	}
+	hook.Reset()
 }
 
 func Test_User_IsVerified(t *testing.T) {
