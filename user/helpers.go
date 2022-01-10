@@ -73,7 +73,7 @@ func firstStringNotEmpty(strs ...string) string {
 func getGivenDetail(req *http.Request) (d map[string]string) {
 	if req.ContentLength > 0 {
 		if err := json.NewDecoder(req.Body).Decode(&d); err != nil {
-			log.Print(USER_API_PREFIX, "error trying to decode user detail ", err)
+			log.Error(USER_API_PREFIX, "error trying to decode user detail ", err)
 			return nil
 		}
 	}
@@ -113,7 +113,7 @@ func unpackAuth(authLine string) (user *User, passwd string, err error) {
 		if utf8.Valid(decodedPayload) {
 			strPayload = string(decodedPayload)
 		} else {
-			log.Printf("%s authorization: Invalid UTF-8 decoded string, trying with ISO-8859-1", USER_API_PREFIX)
+			log.Debugf("%s authorization: Invalid UTF-8 decoded string, trying with ISO-8859-1", USER_API_PREFIX)
 			strPayload = fromISO8859(decodedPayload)
 		}
 

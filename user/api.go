@@ -325,7 +325,7 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 		s = status.NewApiStatus(http.StatusOK, "OK")
 	}
 	if jsonDetails, err := json.Marshal(s); err != nil {
-		log.Printf("Error marshaling StatusApi data [%s]", s)
+		a.logger.Errorf("Error marshaling StatusApi data [%s]", s)
 		http.Error(res, "Error marshaling data for response", http.StatusInternalServerError)
 	} else {
 		res.Header().Set("content-type", "application/json")
@@ -390,7 +390,8 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 			a.sendError(res, http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN)
 		}
 		// TODO: Verify no return in case of error here ?
-		a.logAudit(req, tokenData, "GetUsers")
+		a.logAudit(req, tokenData, "get users request succedeed")
+		a.logger.Infof("get users request succedeed")
 		a.sendUsers(res, users, tokenData.IsServer)
 	}
 }
@@ -566,6 +567,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, err)
 		} else {
 			a.logAudit(req, tokenData, "update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
+			a.logger.Infof("update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
 			a.sendUser(res, updatedUser, tokenData.IsServer)
 		}
 	}

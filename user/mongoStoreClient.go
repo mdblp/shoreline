@@ -72,7 +72,7 @@ func (c *Client) findUsers(ctx context.Context, filter interface{}, noResultMess
 		return results, err
 	}
 	if results == nil {
-		log.Print(noResultMessage)
+		log.Info(noResultMessage)
 		results = []*User{}
 	}
 
