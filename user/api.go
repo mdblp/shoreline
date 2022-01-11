@@ -737,7 +737,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		if err := a.UpdateUserAfterFailedLogin(req.Context(), result); err != nil {
 			a.logger.Warnf("User '%s' failed to save failed login status [%s]", user.Username, err.Error())
 		}
-		a.logger.Warnf("password mismathed")
+		a.logger.Warnf("password mismatched")
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' passwords do not match", user.Username))
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
@@ -751,10 +751,10 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 			// Default role to patient, if no role is found
 			// FIXME Dirty quirk
 			result.Roles = []string{"patient"}
-			a.logger.Debugf("add default role to patient for username: %s", result.Username)
+			a.logger.Warnf("add default role to patient for username: %s", result.Username)
 		}
 		if requestSource == "private" && !result.HasRole("patient") {
-			a.logger.Debugf("Private route login: Adding patient role to user %v", result.Id)
+			a.logger.Infof("Private route login: Adding patient role to user %v", result.Id)
 			// Let's add the role patient:
 			result.Roles = append([]string{"patient"}, result.Roles...)
 			if err := a.Store.UpsertUser(req.Context(), result); err != nil {
@@ -936,7 +936,7 @@ func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map
 		req.Header.Add(token.TOKEN_DURATION_KEY, strconv.FormatFloat(float64(duration), 'f', -1, 64))
 	} else {
 		// tell us there was no match
-		a.logger.Debug("tried to login using the longtermkey but it didn't match the stored key")
+		a.logger.Warn("tried to login using the longtermkey but it didn't match the stored key")
 	}
 
 	// FIXME: Everybody can request a token with an arbitrary duration
