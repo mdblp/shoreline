@@ -496,7 +496,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Missing current password")
 				return
 			}
-			if !originalUser.PasswordsMatch(*updateUserDetails.CurrentPassword, a.ApiConfig.Salt, a.logger) {
+			if !originalUser.PasswordsMatch(*updateUserDetails.CurrentPassword, a.ApiConfig.Salt) {
 				a.sendError(res, http.StatusUnauthorized, STATUS_PW_WRONG, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
 				return
 			}
@@ -732,7 +732,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	} else if !result.CanPerformALogin(a.ApiConfig.MaxFailedLogin) {
 		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", user.Username))
 
-	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt, a.logger) {
+	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
 		// Limit login failed
 		if err := a.UpdateUserAfterFailedLogin(req.Context(), result); err != nil {
 			a.logger.Warnf("User '%s' failed to save failed login status [%s]", user.Username, err.Error())
@@ -875,7 +875,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a refresh session request for userid: %s", td.UserId)
-
+	a.logger.Tracef("token data payload : %+v", *td)
 	// retrieve User in Db for having last information (role)
 	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
 	if errUser != nil {
@@ -890,7 +890,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	if user.Roles != nil && len(user.Roles) > 0 {
 		role = user.Roles[0]
 	}
-
+	a.logger.Tracef("user role :%s", role)
 	//refresh token with update user information
 	newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: user.Id, IsServer: false, Role: role}
 	tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
@@ -905,6 +905,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		return
 	} else {
 		a.logAudit(req, td, "Refresh session token with last user information")
+		a.logger.Info("Refresh session token with last user information")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 		sendModelAsRes(res, td)
 		return
