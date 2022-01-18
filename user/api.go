@@ -18,10 +18,11 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 	log "github.com/sirupsen/logrus"
-
 	"github.com/gorilla/mux"
+
 	"github.com/mdblp/go-common/clients/status"
 	"github.com/mdblp/shoreline/token"
+	"github.com/mdblp/shoreline/user/middlewares"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -459,6 +460,7 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 // @Router /user/{userid} [put]
 func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a update user request")
+	
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
@@ -585,7 +587,9 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\" "
 // @Router /user/{userid} [get]
 func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a user info request")
+	// retrieves logger from context
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a user info request")
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
@@ -613,7 +617,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
 
 		} else {
-			a.logAudit(req, tokenData, "get user info request succedeed for username:%s and is a clinician {%t}",result.Username, result.IsClinic())
+			a.logAudit(req, tokenData, "get user info request succedeed for username:%s and is a clinician {%t}", result.Username, result.IsClinic())
 			a.sendUser(res, result, tokenData.IsServer)
 		}
 	}
@@ -633,24 +637,24 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 // @Failure 401 {string} string ""
 // @Router /user/{userid} [delete]
 func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-
+	log := middlewares.GetLogReq(req)
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
-	
+
 	if err != nil {
 		a.logger.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a deletion request for userid: %s", td.UserId)
+	log.Infof("processing a deletion request for userid: %s", td.UserId)
 
 	var id string
 	if td.IsServer {
 		id = vars["userid"]
-		a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a deletion request for server:")
-		a.logger.Debug("operating as server")
+		log.Info("processing a deletion request for server")
+		log.Debug("operating as server")
 	} else {
 		id = td.UserId
-		a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a deletion request for user id: %s", id)
+		log.Infof("processing a deletion request for user id: %s", id)
 	}
 
 	pw := getGivenDetail(req)["password"]
@@ -673,11 +677,11 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 				return
 			}
 		}
-		a.logger.Error(http.StatusInternalServerError, err.Error())
+		log.Error(http.StatusInternalServerError, err.Error())
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	a.logger.Error(http.StatusForbidden, STATUS_MISSING_ID_PW)
+	log.Error(http.StatusForbidden, STATUS_MISSING_ID_PW)
 	sendModelAsResWithStatus(res, status.NewStatus(http.StatusForbidden, STATUS_MISSING_ID_PW), http.StatusForbidden)
 }
 
@@ -707,7 +711,7 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a login request for username: %s", user.Username)
-	
+
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)))
 

@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mdblp/shoreline/token"
+	"github.com/mdblp/shoreline/user/middlewares"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -144,6 +145,7 @@ func sendModelAsResWithStatus(res http.ResponseWriter, model interface{}, status
 // logAudit Variatic log for audit trails
 func (a *Api) logAudit(req *http.Request, tokenData *token.TokenData, format string, args ...interface{}) {
 	var prefix string
+	log := middlewares.GetLogReq(req)
 
 	if req.RemoteAddr != "" {
 		prefix = fmt.Sprintf("remoteAddr{%s}, ", req.RemoteAddr)
@@ -159,7 +161,7 @@ func (a *Api) logAudit(req *http.Request, tokenData *token.TokenData, format str
 	}
 
 	s := fmt.Sprintf(format, args...)
-	a.auditLogger.Infof("%s%s", prefix, s)
+	log.Infof("%s%s", prefix, s)
 }
 
 func (a *Api) sendUser(res http.ResponseWriter, user *User, isServerRequest bool) {

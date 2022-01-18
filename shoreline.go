@@ -33,6 +33,7 @@ import (
 	muxprom "gitlab.com/msvechla/mux-prometheus/pkg/middleware"
 
 	"github.com/mdblp/shoreline/user"
+	"github.com/mdblp/shoreline/user/middlewares"
 
 	"github.com/mdblp/go-common/clients/mongo"
 	"github.com/mdblp/go-common/clients/version"
@@ -72,12 +73,17 @@ func main() {
 		servicePort = "9107"
 	}
 
+	h := middlewares.New(log.NewEntry(logger)) 
+	
 	// Instrumentation setup
 	instrumentation := muxprom.NewCustomInstrumentation(true, "dblp", "shoreline", prometheus.DefBuckets, nil, prometheus.DefaultRegisterer)
 
 	shorelineConfig := user.NewConfigFromEnv(logger)
 	mongoConfig.FromEnv()
 	rtr := mux.NewRouter()
+	rtr.Use(middlewares.TraceSessionIdMiddleware)
+	rtr.Use(middlewares.RequestIdMiddleware)
+	rtr.Use(h.LoggingMiddleware)
 	rtr.Use(instrumentation.Middleware)
 
 	/*
