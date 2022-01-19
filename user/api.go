@@ -318,6 +318,7 @@ func (h varsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 // @Failure 500 {string} string "error description"
 // @Router /status [get]
 func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
+
 	var s status.ApiStatus
 	if err := a.Store.Ping(); err != nil {
 		a.logger.Error(http.StatusInternalServerError, STATUS_GETSTATUS_ERR, err.Error())
@@ -350,25 +351,28 @@ func (a *Api) GetStatus(res http.ResponseWriter, req *http.Request) {
 // @Failure 401 {object} status.Status "message returned:\"Not authorized for requested operation\" "
 // @Router /users [get]
 func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a get users request")
+
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, err)
 
 	} else if !tokenData.IsServer {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log)
 
 	} else if len(req.URL.Query()) == 0 {
-		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY)
+		a.sendError(res, http.StatusBadRequest, STATUS_NO_QUERY, log)
 
 		// we do not authorize more than one query param
 	} else if len(req.URL.Query()) > 1 {
-		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM)
+		a.sendError(res, http.StatusBadRequest, STATUS_ONE_QUERY_PARAM, log)
 
 	} else if role := sanitizeRequestParam(req, "role"); role != "" && !IsValidRole(role) {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_ROLE)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_ROLE, log)
 
 	} else if emailVerified := sanitizeRequestParam(req, "emailVerified"); emailVerified != "" && !IsValidBoolean(emailVerified) {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_EMAIL_VERIF_BOOL_PARAM, log)
 
 	} else {
 		userIds := strings.Split(sanitizeRequestParam(req, "id"), ",")
@@ -377,22 +381,22 @@ func (a *Api) GetUsers(res http.ResponseWriter, req *http.Request) {
 		case emailVerified != "":
 			emailVerif, _ := strconv.ParseBool(emailVerified)
 			if users, err = a.Store.FindUsersByEmailVerified(req.Context(), emailVerif); err != nil {
-				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err.Error())
 			}
 		case role != "":
 			if users, err = a.Store.FindUsersByRole(req.Context(), role); err != nil {
-				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err.Error())
 			}
 		case len(userIds[0]) > 0:
 			if users, err = a.Store.FindUsersWithIds(req.Context(), userIds); err != nil {
-				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err.Error())
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err.Error())
 			}
 		default:
-			a.sendError(res, http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN)
+			a.sendError(res, http.StatusBadRequest, STATUS_PARAMETER_UNKNOWN, log)
 		}
 		// TODO: Verify no return in case of error here ?
 		a.logAudit(req, tokenData, "get users request succedeed")
-		a.logger.Infof("get users request succedeed")
+		log.Info("get users request succedeed")
 		a.sendUsers(res, users, tokenData.IsServer)
 	}
 }
@@ -412,33 +416,34 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(300)))
-	a.logger.Infof("processing a creation request")
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a creation request")
 
 	if newUserDetails, err := ParseNewUserDetails(req.Body); err != nil {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, log, err)
 	} else if err := newUserDetails.Validate(requestSource); err != nil { // TODO: Fix this duplicate work!
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, log, err)
 	} else if newUser, err := NewUser(newUserDetails, a.ApiConfig.Salt, requestSource); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, log, err)
 	} else if existingUser, err := a.Store.FindUsers(req.Context(), newUser); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, log, err)
 
 	} else if len(existingUser) != 0 {
-		a.sendError(res, http.StatusConflict, STATUS_ERR_CREATING_USR, fmt.Sprintf("User '%s' already exists", *newUserDetails.Username))
+		a.sendError(res, http.StatusConflict, STATUS_ERR_CREATING_USR, log, fmt.Sprintf("User '%s' already exists", *newUserDetails.Username))
 
 	} else if err := a.Store.UpsertUser(req.Context(), newUser); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_CREATING_USR, log, err)
 
 	} else {
 		tokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: newUser.Id, IsServer: false, Role: "unverified"}
 		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), &tokenData, tokenConfig, a.Store); err != nil {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err)
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, log, err)
 		} else {
-			a.logAudit(req, &tokenData, "CreateUser isClinic{%t}", newUser.IsClinic())
+			a.logAudit(req, &tokenData, "create user with isClinic{%t}", newUser.IsClinic())
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			a.sendUserWithStatus(res, newUser, http.StatusCreated, false)
-			a.logger.Infof("creation request succedeed for username: %s", *newUserDetails.Username)
+			log.Infof("creation request succedeed for username: %s", *newUserDetails.Username)
 		}
 	}
 }
@@ -459,32 +464,33 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 // @Failure 400 {object} status.Status "message returned:\"Invalid user details were given\" "
 // @Router /user/{userid} [put]
 func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a update user request")
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a update user request")
 	
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, err)
 
 	} else if updateUserDetails, err := ParseUpdateUserDetails(req.Body); err != nil {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, log, err)
 
 	} else if err := updateUserDetails.Validate(); err != nil {
-		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, err)
+		a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, log, err)
 
 	} else if updateUserDetails.nFields < 1 {
-		a.sendError(res, http.StatusNotModified, STATUS_INVALID_USER_DETAILS, "Empty payload")
+		a.sendError(res, http.StatusNotModified, STATUS_INVALID_USER_DETAILS, log, "Empty payload")
 
 	} else if originalUser, err := a.Store.FindUser(req.Context(), &User{Id: firstStringNotEmpty(vars["userid"], tokenData.UserId)}); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 
 	} else if originalUser == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, "User not found")
 
 	} else if !a.isAuthorized(tokenData, originalUser.Id) {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User does not have permissions")
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, "User does not have permissions")
 
 	} else if updateUserDetails.EmailVerified != nil && !tokenData.IsServer {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User does not have permissions")
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, "User does not have permissions")
 
 	} else {
 
@@ -495,11 +501,11 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			// Patient password change is done differently
 			// Server token: Can perform the change
 			if updateUserDetails.CurrentPassword == nil {
-				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "Missing current password")
+				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, "Missing current password")
 				return
 			}
 			if !originalUser.PasswordsMatch(*updateUserDetails.CurrentPassword, a.ApiConfig.Salt) {
-				a.sendError(res, http.StatusUnauthorized, STATUS_PW_WRONG, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
+				a.sendError(res, http.StatusUnauthorized, STATUS_PW_WRONG, log, "User does not have permissions", fmt.Errorf("User '%s' passwords do not match", originalUser.Username))
 				return
 			}
 		}
@@ -507,15 +513,15 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 		// Check role
 		if updateUserDetails.Roles != nil {
 			if len(updateUserDetails.Roles) != 1 {
-				a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, errors.New("multiple roles were provided"))
+				a.sendError(res, http.StatusBadRequest, STATUS_INVALID_USER_DETAILS, log, errors.New("multiple roles were provided"))
 				return
 			}
 			if updateUserDetails.Roles[0] != originalUser.Roles[0] && (originalUser.Roles[0] == "patient" || originalUser.Roles[0] == "hcp") {
-				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, errors.New("patients or HCPs cannot change role"))
+				a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, errors.New("patients or HCPs cannot change role"))
 				return
 			}
 			if updateUserDetails.Roles[0] != originalUser.Roles[0] && updateUserDetails.Roles[0] != "hcp" {
-				a.sendError(res, http.StatusForbidden, STATUS_UNAUTHORIZED, errors.New("caregivers cannot change role for something else than hcp"))
+				a.sendError(res, http.StatusForbidden, STATUS_UNAUTHORIZED, log, errors.New("caregivers cannot change role for something else than hcp"))
 				return
 			}
 		}
@@ -533,21 +539,21 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			}
 
 			if results, err := a.Store.FindUsers(req.Context(), dupCheck); err != nil {
-				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 				return
 			} else if len(results) == 1 && results[0].Id != firstStringNotEmpty(vars["userid"], tokenData.UserId) {
 				//only throw an error if there is a user with a different id but with the same username/email
-				a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS)
+				a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS, log)
 				return
 			} else if len(results) > 1 {
-				a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS)
+				a.sendError(res, http.StatusConflict, STATUS_USR_ALREADY_EXISTS, log)
 				return
 			}
 		}
 
 		if updateUserDetails.Password != nil {
 			if err := updatedUser.HashPassword(*updateUserDetails.Password, a.ApiConfig.Salt); err != nil {
-				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, err)
+				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, log, err)
 				return
 			}
 		}
@@ -565,10 +571,10 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 		}
 
 		if err := a.Store.UpsertUser(req.Context(), updatedUser); err != nil {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, err)
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, log, err)
 		} else {
 			a.logAudit(req, tokenData, "update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
-			a.logger.Infof("update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
+			log.Infof("update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
 			a.sendUser(res, updatedUser, tokenData.IsServer)
 		}
 	}
@@ -592,7 +598,7 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 	log.Info("processing a user info request")
 	sessionToken := sanitizeSessionToken(req)
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, err)
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, err)
 	} else {
 		var user *User
 		if userID := vars["userid"]; userID != "" {
@@ -602,19 +608,19 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 		}
 
 		if results, err := a.Store.FindUsers(req.Context(), user); err != nil {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 
 		} else if len(results) == 0 {
-			a.sendError(res, http.StatusNotFound, STATUS_USER_NOT_FOUND)
+			a.sendError(res, http.StatusNotFound, STATUS_USER_NOT_FOUND, log)
 
 		} else if len(results) != 1 {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, fmt.Sprintf("Found %d users matching %#v", len(results), user))
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, fmt.Sprintf("Found %d users matching %#v", len(results), user))
 
 		} else if result := results[0]; result == nil {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, "Found user is nil")
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, "Found user is nil")
 
 		} else if !a.isAuthorized(tokenData, result.Id) {
-			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED)
+			a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log)
 
 		} else {
 			a.logAudit(req, tokenData, "get user info request succedeed for username:%s and is a clinician {%t}", result.Username, result.IsClinic())
@@ -641,7 +647,7 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
 
 	if err != nil {
-		a.logger.Error(http.StatusUnauthorized, err.Error())
+		log.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -701,16 +707,18 @@ func (a *Api) DeleteUser(res http.ResponseWriter, req *http.Request, vars map[st
 // @Router /login [post]
 func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	requestSource := req.Header.Get(HEADER_REQUEST_SOURCE)
+	log := middlewares.GetLogReq(req)
 	user, password, err := unpackAuth(sanitizeRequestHeader(req, "Authorization"))
 	if err != nil {
-		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, err)
+		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, log, err)
 		return
 	}
 	if user == nil {
-		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW)
+		a.sendError(res, http.StatusBadRequest, STATUS_MISSING_ID_PW, log)
 		return
 	}
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a login request for username: %s", user.Username)
+
+	log.Infof("processing a login request for username: %s", user.Username)
 
 	// Random sleep to avoid guessing accounts user.
 	time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)))
@@ -719,33 +727,33 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 	defer a.removeUserLoginInProgress(elem)
 	if code != http.StatusOK {
 		exceededConcurrentLoginCounter.Inc()
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.totalInProgress))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' has too many ongoing login: %d", user.Username, a.loginLimiter.totalInProgress))
 
 	} else if results, err := a.Store.FindUsers(req.Context(), user); err != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, STATUS_USER_NOT_FOUND, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, STATUS_USER_NOT_FOUND, err)
 
 	} else if len(results) != 1 {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' have %d matching results", user.Username, len(results)))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' have %d matching results", user.Username, len(results)))
 
 	} else if result := results[0]; result == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is nil", user.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' is nil", user.Username))
 
 	} else if result.IsDeleted() {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' is marked deleted", user.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' is marked deleted", user.Username))
 
 	} else if !result.CanPerformALogin(a.ApiConfig.MaxFailedLogin) {
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' can't perform a login yet", user.Username))
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' can't perform a login yet", user.Username))
 
 	} else if !result.PasswordsMatch(password, a.ApiConfig.Salt) {
 		// Limit login failed
 		if err := a.UpdateUserAfterFailedLogin(req.Context(), result); err != nil {
-			a.logger.Warnf("User '%s' failed to save failed login status [%s]", user.Username, err.Error())
+			log.Warnf("User '%s' failed to save failed login status [%s]", user.Username, err.Error())
 		}
-		a.logger.Warnf("password mismatched")
-		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, fmt.Sprintf("User '%s' passwords do not match", user.Username))
+		log.Warnf("password mismatched")
+		a.sendError(res, http.StatusUnauthorized, STATUS_NO_MATCH, log, fmt.Sprintf("User '%s' passwords do not match", user.Username))
 
 	} else if !result.IsEmailVerified(a.ApiConfig.VerificationSecret) {
-		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED)
+		a.sendError(res, http.StatusForbidden, STATUS_NOT_VERIFIED, log)
 
 	} else {
 		// Login succeed:
@@ -755,14 +763,14 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 			// Default role to patient, if no role is found
 			// FIXME Dirty quirk
 			result.Roles = []string{"patient"}
-			a.logger.Warnf("add default role to patient for username: %s", result.Username)
+			log.Warnf("add default role to patient for username: %s", result.Username)
 		}
 		if requestSource == "private" && !result.HasRole("patient") {
-			a.logger.Infof("Private route login: Adding patient role to user %v", result.Id)
+			log.Infof("Private route login: Adding patient role to user %v", result.Id)
 			// Let's add the role patient:
 			result.Roles = append([]string{"patient"}, result.Roles...)
 			if err := a.Store.UpsertUser(req.Context(), result); err != nil {
-				a.logger.Debugf("Login of a non patient user from our private endpoint. Error while adding the role patient: %s", err)
+				log.Debugf("Login of a non patient user from our private endpoint. Error while adding the role patient: %s", err)
 			}
 		} else if len(result.Roles) > 0 {
 			// FIXME: replace this workaround, we should support multi roles
@@ -772,16 +780,16 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: role}
 		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store); err != nil {
-			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, err)
+			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, log, err)
 
 		} else {
-			a.logAudit(req, tokenData, "Login")
+			a.logAudit(req, tokenData, "login succeeded")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			a.sendUser(res, result, false)
 		}
 
 		if err := a.UpdateUserAfterSuccessfulLogin(req.Context(), result); err != nil {
-			a.logger.Errorf("Failed to save success login status [%s] for user %#v", err.Error(), result)
+			log.Errorf("Failed to save success login status [%s] for user %#v", err.Error(), result)
 		}
 	}
 }
@@ -802,13 +810,14 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 	// which server is knocking at the door and what password is it using to enter?
 	server, pw := sanitizeRequestHeader(req, TP_SERVER_NAME), req.Header.Get(TP_SERVER_SECRET)
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a server login request for server: %s", server)
+	log := middlewares.GetLogReq(req)
+	log.Infof("processing a server login request for server: %s", server)
 	// the expected secret is the secret that the requesting server is supposed to give to be delivered the token
 	expectedSecret := ""
 
 	// if server or password is not given we obviously have a problem
 	if server == "" || pw == "" {
-		a.logger.Error(http.StatusBadRequest, STATUS_MISSING_ID_PW)
+		log.Error(http.StatusBadRequest, STATUS_MISSING_ID_PW)
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusBadRequest, STATUS_MISSING_ID_PW), http.StatusBadRequest)
 		return
 	}
@@ -827,7 +836,7 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 
 	// If no expected secret can be compared to, we have a problem and cannot continue
 	if expectedSecret == "" {
-		a.logger.Error(http.StatusInternalServerError, STATUS_NO_EXPECTED_PWD)
+		log.Error(http.StatusInternalServerError, STATUS_NO_EXPECTED_PWD)
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_NO_EXPECTED_PWD), http.StatusInternalServerError)
 		return
 	}
@@ -842,18 +851,18 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 			a.Store,
 		); err != nil {
 			// Error generating the token
-			a.logger.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
+			log.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 			sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
 			return
 		} else {
 			// Server is provided with the generated token
-			a.logAudit(req, nil, "ServerLogin")
+			a.logAudit(req, nil, "server Login succeeded")
 			res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 			return
 		}
 	}
 	// If the password given at the door is wrong, we cannot generate the token
-	a.logger.Error(http.StatusUnauthorized, STATUS_PW_WRONG)
+	log.Error(http.StatusUnauthorized, STATUS_PW_WRONG)
 	sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_PW_WRONG), http.StatusUnauthorized)
 }
 
@@ -872,21 +881,23 @@ func (a *Api) ServerLogin(res http.ResponseWriter, req *http.Request) {
 // @Router /login [get]
 func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
-	
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a refresh session request")
+
 	if err != nil {
-		a.logger.Error(http.StatusUnauthorized, err.Error())
+		log.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	a.logger.WithField("trace_token", sanitizeSessionTrace(req)).Infof("processing a refresh session request for userid: %s", td.UserId)
-	a.logger.Tracef("token data payload : %+v", *td)
+	log.Infof("processing a refresh session request for userid: %s", td.UserId)
+	log.Tracef("token data payload : %+v", *td)
 	// retrieve User in Db for having last information (role)
 	user, errUser := a.Store.FindUser(req.Context(), &User{Id: td.UserId})
 	if errUser != nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, err)
+		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 
 	} else if user == nil {
-		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, "User not found")
+		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, "User not found")
 	}
 
 	// Set Role
@@ -894,7 +905,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 	if user.Roles != nil && len(user.Roles) > 0 {
 		role = user.Roles[0]
 	}
-	a.logger.Tracef("user role :%s", role)
+	log.Tracef("user role :%s", role)
 	//refresh token with update user information
 	newTokenData := token.TokenData{DurationSecs: extractTokenDuration(req), UserId: user.Id, IsServer: false, Role: role}
 	tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
@@ -904,12 +915,12 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		tokenConfig,
 		a.Store,
 	); err != nil {
-		a.logger.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
+		log.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
 		return
 	} else {
 		a.logAudit(req, td, "Refresh session token with last user information")
-		a.logger.Info("Refresh session token with last user information")
+		log.Info("Refresh session token with last user information")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
 		sendModelAsRes(res, td)
 		return
@@ -935,13 +946,15 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 	duration := a.ApiConfig.LongTermsDuration
 	longtermkey := vars["longtermkey"]
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a long term loging request")
 
 	if longtermkey == a.ApiConfig.LongTermKey {
-		a.logger.Debug("token duration is ", fmt.Sprint(time.Duration(duration)*time.Second))
+		log.Debug("token duration is ", fmt.Sprint(time.Duration(duration)*time.Second))
 		req.Header.Add(token.TOKEN_DURATION_KEY, strconv.FormatFloat(float64(duration), 'f', -1, 64))
 	} else {
 		// tell us there was no match
-		a.logger.Warn("tried to login using the longtermkey but it didn't match the stored key")
+		log.Warn("tried to login using the longtermkey but it didn't match the stored key")
 	}
 
 	// FIXME: Everybody can request a token with an arbitrary duration
@@ -962,20 +975,23 @@ func (a *Api) LongtermLogin(res http.ResponseWriter, req *http.Request, vars map
 // @Failure 401 {object} status.Status "message returned:\"No x-tidepool-session-token was found\" "
 // @Router /token/{token} [get]
 func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars map[string]string) {
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a server check request")
 
 	if hasServerToken(req.Header.Get(TP_SESSION_TOKEN), a.ApiConfig.Secret) {
 		td, err := a.authenticateSessionToken(req.Context(), vars["token"])
 		if err != nil {
-			a.logger.Errorf("failed request: %v", req)
-			a.logger.Error(http.StatusUnauthorized, STATUS_NO_TOKEN, err.Error())
+			log.Errorf("failed request: %v", req)
+			log.Error(http.StatusUnauthorized, STATUS_NO_TOKEN, err.Error())
 			sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_NO_TOKEN), http.StatusUnauthorized)
 			return
 		}
 		sendModelAsRes(res, td)
 		return
 	}
-	a.logger.Info(http.StatusUnauthorized, STATUS_NO_TOKEN)
-	a.logger.Debugf("header session token: %v", sanitizeSessionToken(req))
+
+	log.Info(http.StatusUnauthorized, STATUS_NO_TOKEN)
+	log.Debugf("header session token: %v", sanitizeSessionToken(req))
 	sendModelAsResWithStatus(res, status.NewStatus(http.StatusUnauthorized, STATUS_NO_TOKEN), http.StatusUnauthorized)
 }
 
@@ -988,14 +1004,17 @@ func (a *Api) ServerCheckToken(res http.ResponseWriter, req *http.Request, vars 
 // @Success 200 {string} string ""
 // @Router /logout [post]
 func (a *Api) Logout(res http.ResponseWriter, req *http.Request) {
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a logout request")
+
 	if id := sanitizeSessionToken(req); id != "" {
 		if err := a.Store.RemoveTokenByID(req.Context(), id); err != nil {
 			//silently fail but still log it
-			a.logger.Error("Logout was unable to delete token", err.Error())
+			log.Error("Logout was unable to delete token", err.Error())
 		}
 	}
 	// otherwise all good
-	a.logAudit(req, nil, "Logout")
+	a.logAudit(req, nil, "logout request succeeded")
 	res.WriteHeader(http.StatusOK)
 }
 
@@ -1023,6 +1042,8 @@ func (a *Api) AnonymousIdHashPair(res http.ResponseWriter, req *http.Request) {
 // @Failure 400 {object} status.Status "message returned:\"Unknown query parameter\" or \"Error generating the token\" "
 // @Router /ext-token/{service} [post]
 func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars map[string]string) {
+	log := middlewares.GetLogReq(req)
+	log.Info("processing a 3rd party token generation request")
 
 	secret := ""
 	service := vars["service"]
@@ -1035,7 +1056,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 
 	if secret == "" {
 		// the secret is not defined for this service
-		a.logger.Error(http.StatusBadRequest, "the service does not exist")
+		log.Error(http.StatusBadRequest, "the service does not exist")
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusBadRequest, STATUS_ERR_GENERATING_TOKEN), http.StatusBadRequest)
 		return
 	}
@@ -1043,7 +1064,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 	td, err := a.authenticateSessionToken(req.Context(), sanitizeSessionToken(req))
 
 	if err != nil {
-		a.logger.Error(http.StatusUnauthorized, err.Error())
+		log.Error(http.StatusUnauthorized, err.Error())
 		res.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -1053,7 +1074,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 		td,
 		token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: secret},
 	); err != nil {
-		a.logger.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
+		log.Error(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN, err.Error())
 		sendModelAsResWithStatus(res, status.NewStatus(http.StatusInternalServerError, STATUS_ERR_GENERATING_TOKEN), http.StatusInternalServerError)
 		return
 	} else {
@@ -1064,7 +1085,7 @@ func (a *Api) Get3rdPartyToken(res http.ResponseWriter, req *http.Request, vars 
 	}
 }
 
-func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, extras ...interface{}) {
+func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, log *log.Entry, extras ...interface{}) {
 	_, file, line, ok := runtime.Caller(1)
 	if ok {
 		segments := strings.Split(file, "/")
@@ -1162,7 +1183,7 @@ func (a *Api) sendError(res http.ResponseWriter, statusCode int, reason string, 
 		httpErrorCounter.WithLabelValues(STATUS_INVALID_ROLE).Inc()
 	}
 
-	a.logger.Errorf("%s:%d RESPONSE ERROR: [%d %s] %s", file, line, statusCode, reason, strings.Join(messages, "; "))
+	log.Errorf("%s:%d http response: [%d %s] %s", file, line, statusCode, reason, strings.Join(messages, "; "))
 	sendModelAsResWithStatus(res, status.NewStatus(statusCode, reason), statusCode)
 }
 
