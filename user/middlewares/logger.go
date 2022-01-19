@@ -21,17 +21,19 @@ func New(mainLog *log.Entry) (h handler) {
 
 func GetLogReq(r *http.Request) *log.Entry {
 	return getLogCtx(r.Context())
- }
+}
  
- func getLogCtx(ctx context.Context) *log.Entry {
-	logger := ctx.Value(LoggerKey).(*log.Entry)
+func getLogCtx(ctx context.Context) *log.Entry {
+	logger := ctx.Value(LoggerKey)
  
 	if logger == nil {
-	   log.Fatal("Logger is missing in the context") // panics
+	   log.Warn("Logger is missing in the context, create a backup one") // panics
+	   logger = log.StandardLogger()
+	   return log.NewEntry(logger.(*log.Logger))
 	}
  
-	return logger
- }
+	return logger.(*log.Entry)
+}
 
 func (h handler) LoggingMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
