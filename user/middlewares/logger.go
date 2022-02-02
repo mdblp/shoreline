@@ -1,14 +1,14 @@
 package middlewares
 
 import (
-	"context"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/mdblp/shoreline/common/logging"
 )
 
-type loggerKeyType int
-const LoggerKey  loggerKeyType = iota
+
 
 
 type handler struct{ Log *log.Entry }
@@ -20,21 +20,9 @@ func New(mainLog *log.Entry) (h handler) {
 }
 
 func GetLogReq(r *http.Request) *log.Entry {
-	return getLogCtx(r.Context())
+	return logging.FromContext(r.Context())
 }
  
-func getLogCtx(ctx context.Context) *log.Entry {
-	logger := ctx.Value(LoggerKey)
- 
-	if logger == nil {
-	   log.Warn("Logger is missing in the context, create a backup one") // panics
-	   logger = log.StandardLogger()
-	   return log.NewEntry(logger.(*log.Logger))
-	}
- 
-	return logger.(*log.Entry)
-}
-
 func (h handler) LoggingMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -46,7 +34,7 @@ func (h handler) LoggingMiddleware(next http.Handler) http.Handler {
 			h.Log = h.Log.WithFields(log.Fields{"request-id": requestId})
 		}
 
-		ctx = context.WithValue(ctx, LoggerKey, h.Log)
+		ctx = logging.WithLogger(ctx, h.Log)
 		
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}

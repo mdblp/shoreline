@@ -10,6 +10,8 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+
+	"github.com/mdblp/shoreline/common/logging"
 )
 
 func Test_LoggingMiddleware_SetLogger(t *testing.T) {
@@ -30,7 +32,7 @@ func Test_LoggingMiddleware_SetLogger(t *testing.T) {
 	router.Use(h.LoggingMiddleware)
 
 	router.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-		currentlog := getLogCtx(r.Context())
+		currentlog := logging.FromContext(r.Context())
 		assert.Equal(t, 0, len(currentlog.Data))
 	})
 
@@ -56,7 +58,7 @@ func Test_LoggingMiddleware_SetLoggerWithTraceId(t *testing.T) {
 	router.Use(h.LoggingMiddleware)
 
 	router.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-		currentlog := getLogCtx(r.Context())
+		currentlog := logging.FromContext(r.Context())
 		// We assert that a field is present in the logger
 		assert.Equal(t, 1, len(currentlog.Data))
 		assert.Contains(t, currentlog.Data, "trace-session")
@@ -84,7 +86,7 @@ func Test_LoggingMiddleware_SetLoggerWithRequestId(t *testing.T) {
 	router.Use(h.LoggingMiddleware)
 
 	router.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-		currentlog := getLogCtx(r.Context())
+		currentlog := logging.FromContext(r.Context())
 		assert.Equal(t, 1, len(currentlog.Data))
 		assert.Contains(t, currentlog.Data, "request-id")
 	})
@@ -112,7 +114,7 @@ func Test_LoggingMiddleware_SetLoggerWith_TracingId_And_RequestId(t *testing.T) 
 	router.Use(h.LoggingMiddleware)
 
 	router.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-		currentlog := getLogCtx(r.Context())
+		currentlog := logging.FromContext(r.Context())
 		assert.Equal(t, 2, len(currentlog.Data))
 		assert.Contains(t, currentlog.Data, "request-id")
 		assert.Contains(t, currentlog.Data, "trace-session")
@@ -124,6 +126,6 @@ func Test_LoggingMiddleware_SetLoggerWith_TracingId_And_RequestId(t *testing.T) 
 
 func Test_GetLogCtx_WithNoLogger(t *testing.T) {
 	ctx := context.Background()
-	log := getLogCtx(ctx)
+	log := logging.FromContext(ctx)
 	assert.NotNil(t, log)
 }
