@@ -53,7 +53,15 @@ func main() {
 		logLevel = log.WarnLevel
 	}
 	logger.SetLevel(logLevel)
-	logger.Infof("Starting shoreline service %v\n", version.GetVersion().String())
+
+	// Development mode?
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "development" {
+		logger.Info("starting shoreline in development mode")
+	} else {
+		appEnv = "production"
+	}
+	logger.Infof("Starting shoreline service %v (%s mode)\n", version.GetVersion().String(), appEnv)
 
 	auditLogger := log.New()
 	auditLogger.Out = os.Stdout
@@ -63,6 +71,7 @@ func main() {
 	})
 	auditLogger.SetReportCaller(true)
 	auditLogger.SetLevel(logLevel)
+
 	// Init random number generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -73,8 +82,8 @@ func main() {
 		servicePort = "9107"
 	}
 
-	h := middlewares.New(log.NewEntry(logger)) 
-	
+	h := middlewares.New(log.NewEntry(logger))
+
 	// Instrumentation setup
 	instrumentation := muxprom.NewCustomInstrumentation(true, "dblp", "shoreline", prometheus.DefBuckets, nil, prometheus.DefaultRegisterer)
 
