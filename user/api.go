@@ -1407,6 +1407,8 @@ func (a *Api) authenticateSessionToken(ctx context.Context, sessionToken string)
 		return nil, errors.New("session token is empty")
 	} else if tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, a.ApiConfig.Secret); err != nil {
 		return nil, err
+	} else if _, err := a.Store.FindTokenByID(ctx, sessionToken); err != nil {
+		return nil, err
 	} else {
 		return tokenData, nil
 	}
