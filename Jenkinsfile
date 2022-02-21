@@ -1,4 +1,4 @@
-@Library('mdblp-library') _
+@Library('mdblp-library@feature/multiplatform') _
 def builderImage
 pipeline {
     agent any
@@ -31,7 +31,7 @@ pipeline {
             }
             steps {
                 script {
-                    sh "$WORKSPACE/build.sh"
+                    sh "$WORKSPACE/build.sh linux/amd64"
                 }
             }
         }
