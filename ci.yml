@@ -5,7 +5,7 @@ runTests: false
 docker: true
 dockerPushToProduction : true
 dockerBuild: 
-  platform: 'linux/arm64/v8,linux/amd64'
+  platform: 'linux/arm64,linux/amd64'
   buildArgs:
   - 'APP_VERSION=$version'
 publishNpm: false
