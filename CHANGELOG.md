@@ -2,7 +2,7 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
-## 1.8.8-rc1 - 2022-02-21 
+## Unreleased
 ### Engineering 
 - Build multi-architecture docker images
 
