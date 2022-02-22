@@ -56,9 +56,7 @@ func main() {
 
 	// Development mode?
 	appEnv := os.Getenv("APP_ENV")
-	if appEnv == "development" {
-		logger.Info("starting shoreline in development mode")
-	} else {
+	if appEnv != "development" && appEnv != "dev" {
 		appEnv = "production"
 	}
 	logger.Infof("Starting shoreline service %v (%s mode)\n", version.GetVersion().String(), appEnv)

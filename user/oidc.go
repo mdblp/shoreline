@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -179,19 +180,13 @@ func (a *Api) UpdateUserWithOauth(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Retrieve OAuth token from cookie
-	oAuthTokens := OidcTokens{}
 	if oAuthCookieVal, err := a.provider.CookieHandler().CheckCookie(req, "ecps-oidc"); err != nil {
 		a.sendError(res, http.StatusUnauthorized, "Oauth cookie not provided", log, err)
 		return
-	} else if oAuthTokens.Decode(oAuthCookieVal) != nil {
+	} else if oidcId, err := a.retrieveOauthId(oAuthCookieVal); err != nil {
 		a.sendError(res, http.StatusInternalServerError, "Error while decoding Oauth cookie", log, err)
-		return
-	} else if jwtToken, _ := jwt.Parse(oAuthTokens.AuthToken, nil); jwtToken == nil {
-		a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, STATUS_USER_NOT_FOUND, err)
-		return
 	} else {
-		claims := jwtToken.Claims.(jwt.MapClaims)
-		user.FrProId = claims["sub"].(string)
+		user.FrProId = oidcId
 	}
 
 	log.Infof("Will merge account %v with idNat %v", user.Id, user.FrProId)
@@ -221,5 +216,22 @@ func (a *Api) UpdateUserWithOauth(res http.ResponseWriter, req *http.Request) {
 		} else {
 			a.sendUserWithStatus(res, updatedUser, http.StatusAccepted, false)
 		}
+	}
+}
+
+// Extract OAuth/Oidc unique id from our cookie
+func (a *Api) retrieveOauthId(cookie string) (string, error) {
+	oAuthTokens := OidcTokens{}
+
+	if err := oAuthTokens.Decode(cookie); err != nil {
+		return "", err
+	} else if jwtToken, _ := jwt.Parse(oAuthTokens.AuthToken, nil); jwtToken == nil {
+		return "", err
+	} else {
+		claims := jwtToken.Claims.(jwt.MapClaims)
+		if claims["sub"] == nil {
+			return "", errors.New("OIDC token does not contain field 'sub'")
+		}
+		return claims["sub"].(string), nil
 	}
 }
