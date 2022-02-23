@@ -190,6 +190,7 @@ func (a *Api) asSerializableUser(user *User, isServerRequest bool) interface{} {
 	}
 	if len(user.FrProId) > 0 {
 		serializable["frProId"] = user.FrProId
+		serializable["idVerified"] = true
 	}
 	if len(user.Emails) > 0 {
 		serializable["emails"] = user.Emails

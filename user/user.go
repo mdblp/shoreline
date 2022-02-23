@@ -28,6 +28,7 @@ type User struct {
 	ModifiedUserID string                 `json:"modifiedUserId,omitempty" bson:"modifiedUserId,omitempty"`
 	DeletedTime    string                 `json:"deletedTime,omitempty" bson:"deletedTime,omitempty"`
 	DeletedUserID  string                 `json:"deletedUserId,omitempty" bson:"deletedUserId,omitempty"`
+	IdVerified     bool                   `json:"idVerified,omitempty"`
 }
 
 // FailedLoginInfos monitor the failed login of an user account.
