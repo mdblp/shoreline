@@ -67,7 +67,7 @@ func (c *Client) FindUser(ctx context.Context, user *User) (result *User, err er
 	return result, nil
 }
 
-func (c *Client) findDirtyUser(ctx context.Context, filter interface{}, noResultMessage string) (found bool) {
+func (c *Client) findDirtyUser(ctx context.Context, filter interface{}, resultMessage string) (found bool) {
 	var results []*User
 	log := logging.FromContext(ctx)
 	cursor, err := mgoDirtyCollection(c).Find(ctx, filter)
@@ -76,13 +76,22 @@ func (c *Client) findDirtyUser(ctx context.Context, filter interface{}, noResult
 	}
 	defer cursor.Close(ctx)
 	if err = cursor.All(ctx, &results); err != nil {
+		log.Info(resultMessage)
 		return true
 	}
 	if results == nil {
-		log.Info(noResultMessage)
+		log.Infof("no %v", resultMessage)
 		return false
 	}
 	return true
+}
+
+func (c *Client) UpsertDirty(ctx context.Context, username string) error {
+	options := options.Update().SetUpsert(true)
+	update := bson.M{"$set": bson.M{"username": username}}
+	// if the user already exists we update otherwise we add
+	_, err := mgoDirtyCollection(c).UpdateOne(ctx, bson.M{"username": username}, update, options)
+	return err
 }
 
 func (c *Client) findUsers(ctx context.Context, filter interface{}, noResultMessage string) (results []*User, err error) {
@@ -116,8 +125,8 @@ func (c *Client) ExistDirtyUser(ctx context.Context, username string) (res bool)
 	if len(fieldsToMatch) == 0 {
 		return false
 	}
-	noUserMessage := fmt.Sprintf("no user found: query: (Name ~= %v)", username)
-	return c.findDirtyUser(ctx, bson.M{"$or": fieldsToMatch}, noUserMessage)
+	userMessage := fmt.Sprintf("user found: query: (Name ~= %v)", username)
+	return c.findDirtyUser(ctx, bson.M{"$or": fieldsToMatch}, userMessage)
 }
 
 func (c *Client) FindUsers(ctx context.Context, user *User) (results []*User, err error) {

@@ -310,3 +310,33 @@ func TestMongoStoreTokenOperations(t *testing.T) {
 	}
 
 }
+
+func TestMongoStore_ExistDirty(t *testing.T) {
+
+	var (
+		dirty_exist     = "dirty.exist@foo.bar10"
+		dirty_not_exist = "dirty.not.exist@foo.bar10"
+	)
+	ctx := context.Background()
+	mc, err := mgoTestSetup()
+	if err != nil {
+		t.Fatalf("we initialise the test store %s", err.Error())
+	}
+
+	/*
+	 * THE Setup
+	 */
+
+	if err := mc.UpsertDirty(ctx, dirty_exist); err != nil {
+		t.Fatalf("we could not create the dirty account %v, [%v]", dirty_exist, err)
+	}
+
+	if found := mc.ExistDirtyUser(ctx, dirty_exist); !found {
+		t.Fatalf("error finding the dirty account %v", dirty_exist)
+	}
+
+	if found := mc.ExistDirtyUser(ctx, dirty_not_exist); found {
+		t.Fatalf("dirty account %v should not be found", dirty_not_exist)
+	}
+
+}
