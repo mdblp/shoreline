@@ -33,6 +33,7 @@ func mgoTestSetup() (*Client, error) {
 
 	//just drop and don't worry about any errors
 	mgoUsersCollection(mc).Drop(context.TODO())
+	mgoDirtyCollection(mc).Drop(context.TODO())
 
 	return mc, nil
 }
