@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 1.9.4 - 2022-06-08
+### Added
+- YLP-1593 Search users in Auth0 if not found in local DB
+
 ## 1.9.3 - 2022-06-01
 ### Added
 - New role "admin" processed in our auth middleware

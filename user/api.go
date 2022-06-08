@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/mdblp/go-common/clients/status"
+	"github.com/mdblp/shoreline/auth0"
 	"github.com/mdblp/shoreline/token"
 	"github.com/mdblp/shoreline/user/middlewares"
 
@@ -63,6 +64,7 @@ type (
 		auditLogger  *log.Logger
 		loginLimiter LoginLimiter
 		provider     rp.RelyingParty
+		auth0Client  *auth0.Auth0Client
 	}
 	Secret struct {
 		Secret string `json:"secret"`
@@ -314,7 +316,7 @@ func NewConfigFromEnv(log *log.Logger) *ApiConfig {
 }
 
 // New create a new shoreline API config
-func New(cfg *ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger) *Api {
+func New(cfg *ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Logger, auth0Client *auth0.Auth0Client) *Api {
 
 	provider := createOidcProvider(logger, cfg, strings.Join([]string{cfg.PublicApiURl, "oauth/callback"}, "/"))
 	api := Api{
@@ -323,6 +325,7 @@ func New(cfg *ApiConfig, logger *log.Logger, store Storage, auditLogger *log.Log
 		logger:      logger,
 		auditLogger: auditLogger,
 		provider:    provider,
+		auth0Client: auth0Client,
 	}
 
 	api.loginLimiter.usersInProgress = list.New()
@@ -681,6 +684,15 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 
 		} else if len(results) == 0 {
+			// check directly in Aut0
+			auth0Usr, err := a.auth0Client.GetUser(user.Username)
+			if err != nil {
+				a.logger.Error("Query to Auth0 failed: ", err)
+			} else if auth0Usr != nil {
+				foundUser := &User{Id: auth0Usr.UserID, Username: auth0Usr.Username, Roles: auth0Usr.Roles, Emails: auth0Usr.Emails}
+				a.sendUser(res, foundUser, tokenData.IsServer)
+				return
+			}
 			a.sendError(res, http.StatusNotFound, STATUS_USER_NOT_FOUND, log)
 
 		} else if len(results) != 1 {
