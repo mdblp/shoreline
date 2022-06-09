@@ -24,6 +24,7 @@ import (
 
 	"github.com/mdblp/go-common/clients/status"
 	"github.com/mdblp/shoreline/auth0"
+	"github.com/mdblp/shoreline/schema"
 	"github.com/mdblp/shoreline/token"
 	"github.com/mdblp/shoreline/user/middlewares"
 
@@ -539,8 +540,8 @@ func (a *Api) CreateUser(res http.ResponseWriter, req *http.Request) {
 func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[string]string) {
 	log := middlewares.GetLogReq(req)
 	log.Info("processing a update user request")
-
 	sessionToken := sanitizeSessionToken(req)
+	var auth0User = &schema.UserUpdate{}
 	if tokenData, err := a.authenticateSessionToken(req.Context(), sessionToken); err != nil {
 		a.sendError(res, http.StatusUnauthorized, STATUS_UNAUTHORIZED, log, err)
 
@@ -604,10 +605,12 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 			dupCheck := &User{}
 			if updateUserDetails.Username != nil {
 				updatedUser.Username = *updateUserDetails.Username
+				auth0User.Username = updateUserDetails.Username
 				dupCheck.Username = updatedUser.Username
 			}
 			if updateUserDetails.Emails != nil {
 				updatedUser.Emails = updateUserDetails.Emails
+				auth0User.Emails = &updateUserDetails.Emails
 				dupCheck.Emails = updatedUser.Emails
 			}
 
@@ -629,6 +632,7 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 				a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, log, err)
 				return
 			}
+			auth0User.Password = updateUserDetails.Password
 		}
 
 		if updateUserDetails.Roles != nil {
@@ -646,6 +650,17 @@ func (a *Api) UpdateUser(res http.ResponseWriter, req *http.Request, vars map[st
 		if err := a.Store.UpsertUser(req.Context(), updatedUser); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_USR, log, err)
 		} else {
+			if a.auth0Client != nil {
+				if usr, err := a.auth0Client.GetUserById(updatedUser.Id); err == nil && usr != nil {
+					if usr.Username == updatedUser.Username {
+						// no need to update with the same value
+						auth0User.Username = nil
+					}
+					if err := a.auth0Client.UpdateUser(updatedUser.Id, auth0User); err != nil {
+						a.logger.Error("Impossible to update user on Auth0: ", err)
+					}
+				}
+			}
 			a.logAudit(req, tokenData, "update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
 			log.Infof("update request succedeed for username:%s, and is a clinician one{%t}", updatedUser.Username, updatedUser.IsClinic())
 			a.sendUser(res, updatedUser, tokenData.IsServer)
