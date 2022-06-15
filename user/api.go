@@ -709,6 +709,14 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 					a.sendUser(res, foundUser, tokenData.IsServer)
 					return
 				}
+				auth0Usr, err = a.auth0Client.GetUserById(user.Id)
+				if err != nil {
+					a.logger.Error("Query to Auth0 failed: ", err)
+				} else if auth0Usr != nil {
+					foundUser := &User{Id: auth0Usr.UserID, Username: auth0Usr.Username, Roles: auth0Usr.Roles, Emails: auth0Usr.Emails}
+					a.sendUser(res, foundUser, tokenData.IsServer)
+					return
+				}
 			}
 			a.sendError(res, http.StatusNotFound, STATUS_USER_NOT_FOUND, log)
 
