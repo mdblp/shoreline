@@ -1045,7 +1045,7 @@ func (a *Api) RefreshSession(res http.ResponseWriter, req *http.Request) {
 		a.logAudit(req, td, "Refresh session token with last user information")
 		log.Info("Refresh session token with last user information")
 		res.Header().Set(TP_SESSION_TOKEN, sessionToken.ID)
-		sendModelAsRes(res, td)
+		sendModelAsRes(res, user)
 		return
 	}
 }
