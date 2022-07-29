@@ -230,13 +230,7 @@ func (client *Auth0Client) GetUser(email string) (*schema.UserData, error) {
 	if len(users) == 0 {
 		return nil, nil
 	}
-	// extract the user id from the sub field which follows pattern auth0|userid
-	userId := users[0].UserId
-	sub := strings.Split(userId, "|")
-
-	if len(sub) == 2 {
-		userId = sub[1]
-	}
+	userId := parseAuth0Sub(users[0].UserId)
 	user := &schema.UserData{
 		UserID:        userId,
 		Username:      users[0].Email,
@@ -266,13 +260,7 @@ func (client *Auth0Client) GetUserById(id string) (*schema.UserData, error) {
 	if err := json.NewDecoder(res.Body).Decode(&auth0User); err != nil {
 		return nil, err
 	}
-	// extract the user id from the sub field which follows pattern auth0|userid
-	userId := auth0User.UserId
-	sub := strings.Split(userId, "|")
-
-	if len(sub) == 2 {
-		userId = sub[1]
-	}
+	userId := parseAuth0Sub(auth0User.UserId)
 	user := &schema.UserData{
 		UserID:        userId,
 		Username:      auth0User.Email,
@@ -346,4 +334,14 @@ func (client *Auth0Client) GetUserInfo(authHeader string) (*schema.UserData, err
 		Emails:        []string{user.Email},
 	}
 	return resUser, nil
+}
+
+// Extract the user id from the sub field which follows pattern auth0|userid
+func parseAuth0Sub(userId string) string {
+	sub := strings.Split(userId, "|")
+
+	if len(sub) == 2 {
+		userId = sub[1]
+	}
+	return userId
 }
