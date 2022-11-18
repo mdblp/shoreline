@@ -4,10 +4,7 @@ goVersion: "1.17"
 runTests: false
 docker: true
 dockerPushToProduction : true
-dockerBuild: 
-  platform: 'linux/arm64,linux/amd64'
-  buildArgs:
-  - 'APP_VERSION=$version'
+dockerBuildCommand: docker build --build-arg APP_VERSION=$version --build-arg GOPRIVATE=$GOPRIVATE --build-arg GITHUB_TOKEN=$GITHUB_TOKEN
 publishNpm: false
 publishS3: false
 publishOpenapiBucket: com.diabeloop.backloops.docs
