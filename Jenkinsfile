@@ -36,7 +36,7 @@ pipeline {
                 script {
                     withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                         sh 'git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"'
-                        sh "$WORKSPACE/qa/build.sh"
+                        sh "$WORKSPACE/build.sh"
                         sh 'git config --global --unset url."https://${GITHUB_TOKEN}@github.com/".insteadOf'
                     }
                 }
