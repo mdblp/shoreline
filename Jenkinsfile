@@ -74,7 +74,9 @@ pipeline {
         }
         stage('Documentation') {
             steps {
-                genDocumentation()
+                withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    genDocumentation()
+                }
             }
         }
         stage('Publish') {
