@@ -703,8 +703,8 @@ func (a *Api) GetUserInfo(res http.ResponseWriter, req *http.Request, vars map[s
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_FINDING_USR, log, err)
 
 		} else if len(results) == 0 {
-			// check directly in Aut0
-			if a.auth0Client != nil {
+			// check directly in Auth0 if the request is not comming from auth0
+			if a.auth0Client != nil && tokenData.UserId != "auth0" {
 				auth0Usr, err := a.auth0Client.GetUser(user.Username)
 				if err != nil {
 					a.logger.Error("Query to Auth0 failed: ", err)
