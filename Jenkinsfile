@@ -65,7 +65,7 @@ pipeline {
             }
         }
         stage('Publish') {
-            when { branch "dblp" }
+            when { branch "release/1.9.x" }
             steps {
                 publish()
             }
