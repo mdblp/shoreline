@@ -1,8 +1,6 @@
 module github.com/mdblp/shoreline
 
-go 1.21
-
-toolchain go1.22.2
+go 1.22
 
 require (
 	github.com/gin-gonic/gin v1.9.0
