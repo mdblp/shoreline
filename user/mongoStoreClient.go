@@ -38,6 +38,17 @@ func NewStore(config *goComMgo.Config, logger *log.Logger) (*Client, error) {
 				SetUnique(false).
 				SetExpireAfterSeconds(0),
 		}},
+		USERS_COLLECTION: {{
+			Keys: bson.D{{Key: "userid", Value: 1}},
+			Options: options.Index().
+				SetName("UserId").
+				SetUnique(true),
+		}, {
+			Keys: bson.D{{Key: "emails", Value: 1}},
+			Options: options.Index().
+				SetName("Emails").
+				SetUnique(true),
+		}},
 	}
 	store, err := goComMgo.NewStoreClient(config, logger)
 	client.StoreClient = store
