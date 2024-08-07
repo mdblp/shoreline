@@ -41,13 +41,11 @@ func NewStore(config *goComMgo.Config, logger *log.Logger) (*Client, error) {
 		USERS_COLLECTION: {{
 			Keys: bson.D{{Key: "userid", Value: 1}},
 			Options: options.Index().
-				SetName("UserId").
-				SetUnique(true),
+				SetName("UserId"),
 		}, {
 			Keys: bson.D{{Key: "emails", Value: 1}},
 			Options: options.Index().
-				SetName("Emails").
-				SetUnique(true),
+				SetName("Emails"),
 		}},
 	}
 	store, err := goComMgo.NewStoreClient(config, logger)
