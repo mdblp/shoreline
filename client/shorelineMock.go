@@ -1,4 +1,4 @@
-package shoreline
+package client
 
 import (
 	"log"
