@@ -4,8 +4,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/mdblp/shoreline/schema"
-	"github.com/mdblp/shoreline/token"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -35,22 +33,7 @@ func (client *ShorelineMockClient) Close() {
 	log.Println("Close mock shoreline client")
 }
 
-func (client *ShorelineMockClient) Login(username, password string) (*schema.UserData, string, error) {
-	return &schema.UserData{UserID: client.UserID, Username: username, Emails: []string{username}}, client.ServerToken, nil
-}
-
-func (client *ShorelineMockClient) Signup(username, password, email string) (*schema.UserData, error) {
-	return &schema.UserData{UserID: client.UserID, Username: username, Emails: []string{email}}, nil
-}
-
-func (client *ShorelineMockClient) CheckToken(tkn string) *token.TokenData {
-	if client.Unauthorized {
-		return nil
-	}
-	return &token.TokenData{UserId: client.UserID, IsServer: client.IsServer}
-}
-
-func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserData, error) {
+func (client *ShorelineMockClient) GetUser(userID, token string) (*UserData, error) {
 	idVerified := false
 	if strings.Contains(strings.ToLower(userID), "certified") {
 		idVerified = true
@@ -58,17 +41,17 @@ func (client *ShorelineMockClient) GetUser(userID, token string) (*schema.UserDa
 	if userID == "NotFound" {
 		return nil, nil
 	} else if userID == "WithoutPassword" {
-		return &schema.UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"patient"}, IdVerified: idVerified}, nil
+		return &UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"patient"}, IdVerified: idVerified}, nil
 	} else if strings.Contains(strings.ToLower(userID), "clinic") || strings.Contains(strings.ToLower(userID), "hcp") {
-		return &schema.UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"hcp"}, IdVerified: idVerified}, nil
+		return &UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"hcp"}, IdVerified: idVerified}, nil
 	} else if strings.Contains(strings.ToLower(userID), "caregiver") {
-		return &schema.UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"caregiver"}, IdVerified: idVerified}, nil
+		return &UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: false, Roles: []string{"caregiver"}, IdVerified: idVerified}, nil
 	} else {
-		return &schema.UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: true, Roles: []string{"patient"}, IdVerified: idVerified}, nil
+		return &UserData{UserID: userID, Username: "From Mock", Emails: []string{userID}, PasswordExists: true, Roles: []string{"patient"}, IdVerified: idVerified}, nil
 	}
 }
 
-func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate schema.UserUpdate, token string) error {
+func (client *ShorelineMockClient) UpdateUser(userID string, userUpdate UserUpdate, token string) error {
 	return nil
 }
 
@@ -79,9 +62,9 @@ func (client *ShorelineMockClient) TokenProvide() string {
 	return args.Get(0).(string)
 }
 
-func (client *ShorelineMockClient) GetUnverifiedUsers(token string) ([]schema.UserData, error) {
+func (client *ShorelineMockClient) GetUnverifiedUsers(token string) ([]UserData, error) {
 	args := client.Called()
-	return args.Get(0).([]schema.UserData), args.Error(1)
+	return args.Get(0).([]UserData), args.Error(1)
 }
 
 func (client *ShorelineMockClient) DeleteUser(userId string, token string) error {
