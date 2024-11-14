@@ -3,7 +3,7 @@ module github.com/mdblp/shoreline/client
 go 1.22.0
 
 require (
-	github.com/mdblp/go-common/v2 v2.0.2-0.20241112061507-b0a6d4fc2804
+	github.com/mdblp/go-common/v2 v2.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.9.0
 )

@@ -4,7 +4,7 @@ Shoreline is the module that manages user accounts and authentication.
 
 ## 2.2.0 - 2024-11-14
 ### Engineering
-- Make a dedicated module for the shoreline client (shoreline/clients/shoreline)
+- Make a dedicated module for the shoreline client (shoreline/client)
 
 ## 2.1.1 - 2024-08-07
 ### Engineering
