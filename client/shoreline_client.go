@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mdblp/go-common/v2/blperr"
-	common "github.com/mdblp/go-common/v2/clients/utils"
+	"github.com/mdblp/go-common/v2/http/request"
 	"io"
 	"net/http"
 	"net/url"
@@ -262,7 +262,7 @@ func (client *Client) serverLogin() error {
 			Status: status.NewStatusf(res.StatusCode, "Unknown response code from service[%s]", req.URL),
 		}
 	}
-	token := res.Header.Get(common.LegacyTokenHeader)
+	token := res.Header.Get(request.LegacyTokenHeader)
 
 	client.mut.Lock()
 	defer client.mut.Unlock()
@@ -297,7 +297,7 @@ func (client *Client) TokenProvide() string {
 
 // Get users with unverified email
 func (client *Client) GetUnverifiedUsers(ctx context.Context, token string) ([]UserData, error) {
-	req, err := common.NewGetRequest(client.host).
+	req, err := request.NewGetBuilder(client.host).
 		WithPath("user").
 		WithAuthToken(token).WithQueryParams(map[string]string{"emailVerified": "false"}).
 		Build(ctx)
@@ -327,7 +327,7 @@ func (client *Client) GetUnverifiedUsers(ctx context.Context, token string) ([]U
 // Get user details for the given user (from legacy auth system)
 // In this case the userID could be the actual ID or an email address
 func (client *Client) GetUser(ctx context.Context, userId, token string) (*UserData, error) {
-	req, err := common.NewGetRequest(client.host).
+	req, err := request.NewGetBuilder(client.host).
 		WithPath("user", userId).
 		WithAuthToken(token).Build(ctx)
 
@@ -363,7 +363,7 @@ func (client *Client) UpdateUser(ctx context.Context, userId string, userUpdate 
 		Updates UserUpdate `json:"updates"`
 	}
 
-	req, err := common.NewPutRequest(client.host).
+	req, err := request.NewPutBuilder(client.host).
 		WithPath("user", userId).
 		WithAuthToken(token).WithPayload(updatesToApply{Updates: userUpdate}).
 		Build(ctx)

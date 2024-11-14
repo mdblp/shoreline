@@ -13,6 +13,8 @@ github.com/mdblp/go-common/v2 v2.0.2-0.20241112061507-b0a6d4fc2804 h1:tW92j55faM
 github.com/mdblp/go-common/v2 v2.0.2-0.20241112061507-b0a6d4fc2804/go.mod h1:o1J64DoP7XtPckrDnqGdm7nmXwEr7ln5uk/Rfyj759A=
 github.com/mdblp/go-common/v2 v2.1.0 h1:ij1W7AzznHFoysP1DaDoLgelU2TrQcG9q8IACajNjuQ=
 github.com/mdblp/go-common/v2 v2.1.0/go.mod h1:o1J64DoP7XtPckrDnqGdm7nmXwEr7ln5uk/Rfyj759A=
+github.com/mdblp/go-common/v2 v2.1.1 h1:uZBFb7R8TY7j6tt1BXX4mHteU9M9ZcNEG2DbMANxMmc=
+github.com/mdblp/go-common/v2 v2.1.1/go.mod h1:o1J64DoP7XtPckrDnqGdm7nmXwEr7ln5uk/Rfyj759A=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
