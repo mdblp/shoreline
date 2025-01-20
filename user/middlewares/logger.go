@@ -39,15 +39,17 @@ func (h handler) LoggingMiddleware(next http.Handler) http.Handler {
 
 		duration := time.Since(startTime).Milliseconds()
 		reqMethod := r.Method
-		reqUri := r.RequestURI
+		reqUri := r.URL.Path
 		statusCode := "NA" // not available in handlers...jsut created the field
-		log := log.Fields{
-			"method":     reqMethod,
-			"uri":        reqUri,
-			"statusCode": statusCode,
-			"duration":   duration,
+		if reqUri != "/status" {
+			log := log.Fields{
+				"method":     reqMethod,
+				"uri":        reqUri,
+				"statusCode": statusCode,
+				"duration":   duration,
+			}
+			h.Log.WithFields(log).Info()
 		}
-		h.Log.WithFields(log).Info()
 	}
 
 	return http.HandlerFunc(fn)
