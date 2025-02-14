@@ -151,26 +151,37 @@ func (c *Client) ExistDirtyUser(ctx context.Context, username string) (res bool)
 
 func (c *Client) FindUsers(ctx context.Context, user *User) (results []*User, err error) {
 
-	fieldsToMatch := []bson.M{}
-
+	//Start the search by userId
 	if user.Id != "" {
-		fieldsToMatch = append(fieldsToMatch, bson.M{"userid": user.Id})
+		if results, err = c.findUsers(ctx, bson.M{"userid": user.Id}, fmt.Sprintf("no users found: query: (Id = %v)", user.Id)); err != nil {
+			return results, err
+		} else if len(results) > 0 {
+			return results, nil
+		}
 	}
+	//Then by userName lower case
 	if user.Username != "" {
-		// try first a search on lowercase, and then an insensitive search
-		fieldsToMatch = append(fieldsToMatch, bson.M{"username": strings.ToLower(user.Username)})
+		if results, err = c.findUsers(ctx, bson.M{"username": strings.ToLower(user.Username)}, fmt.Sprintf("no users found: query: (Username = %v)", strings.ToLower(user.Username))); err != nil {
+			return results, err
+		} else if len(results) > 0 {
+			return results, nil
+		}
+	}
+
+	//Finally try another strategy (not using indexes)
+	fieldsToMatch := []bson.M{}
+	if user.Username != "" {
 		regexFilter := primitive.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(user.Username)), Options: "i"}
 		fieldsToMatch = append(fieldsToMatch, bson.M{"username": bson.M{"$regex": regexFilter}})
 	}
 	if len(user.Emails) > 0 {
 		fieldsToMatch = append(fieldsToMatch, bson.M{"emails": bson.M{"$in": user.Emails}})
 	}
-
 	if len(fieldsToMatch) == 0 {
 		return []*User{}, nil
 	}
-	noUserMessage := fmt.Sprintf("no users found: query: (Id = %v) OR (Name ~= %v) OR (Emails IN %v)", user.Id, user.Username, user.Emails)
-	return c.findUsers(ctx, bson.M{"$or": fieldsToMatch}, noUserMessage)
+
+	return c.findUsers(ctx, bson.M{"$or": fieldsToMatch}, fmt.Sprintf("no users found: query: (Username = %v)", user.Username))
 }
 
 func (c *Client) FindUsersByRole(ctx context.Context, role string) (results []*User, err error) {
