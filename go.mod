@@ -1,6 +1,8 @@
 module github.com/mdblp/shoreline
 
-go 1.24.6
+go 1.24.0
+
+toolchain go1.24.6
 
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
