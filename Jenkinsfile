@@ -79,6 +79,10 @@ pipeline {
             }
         }
         stage('Documentation') {
+            environment {
+                GOCACHE = ""
+                GOMODCACHE = ""
+            }
             steps {
                 withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     genDocumentation()
