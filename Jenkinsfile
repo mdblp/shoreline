@@ -4,6 +4,10 @@ pipeline {
     agent {
         label 'blp'
     }
+    environment {
+      GOCACHE = "/var/jenkins/go-cache/build"
+      GOMODCACHE = "/var/jenkins/go-cache/mod"
+    }
     stages {
         stage('Initialization') {
             steps {
@@ -30,7 +34,12 @@ pipeline {
                 docker {
                     image env.buildImage
                     label 'blp'
+                    args '-v /var/jenkins/go-cache:/go-cache'
                 }
+            }
+            environment {
+                GOCACHE = "/go-cache/build"
+                GOMODCACHE = "/go-cache/mod"
             }
             steps {
                 script {
@@ -65,13 +74,6 @@ pipeline {
                 }
             }
         }
-        stage('Package') {
-            steps {
-                withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-                    pack()
-                }
-            }
-        }
         stage('Documentation') {
             steps {
                 withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
@@ -79,10 +81,11 @@ pipeline {
                 }
             }
         }
-        stage('Publish') {
+        stage('Package and Publish') {
             when { branch "dblp" }
             steps {
                 withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    pack()
                     publish()
                 }
             }
