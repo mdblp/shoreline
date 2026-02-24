@@ -52,11 +52,15 @@ pipeline {
             }
         }
         stage('Test ') {
+            environment {
+                GOCACHE = "/go-cache/build"
+                GOMODCACHE = "/go-cache/mod"
+            }
             steps {
                 echo 'start mongo to serve as a testing db'
                 sh 'docker network create shorelinetest${RUN_ID} && docker run --rm -d --net=shorelinetest${RUN_ID} --name=mongo4shoreline${RUN_ID} mongo:4.2'
                 script {
-                    docker.image(env.buildImage).inside("--net=shorelinetest${RUN_ID}") {
+                    docker.image(env.buildImage).inside("-v /var/jenkins/go-cache:/go-cache --net=shorelinetest${RUN_ID}") {
                         withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                             sh 'git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"'
                             sh "TIDEPOOL_STORE_ADDRESSES=mongo4shoreline${RUN_ID}:27017  TIDEPOOL_STORE_DATABASE=shoreline_test $WORKSPACE/test.sh"
