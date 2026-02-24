@@ -4,10 +4,6 @@ pipeline {
     agent {
         label 'blp'
     }
-    environment {
-      GOCACHE = "/var/jenkins/go-cache/build"
-      GOMODCACHE = "/var/jenkins/go-cache/mod"
-    }
     stages {
         stage('Initialization') {
             steps {
@@ -79,10 +75,6 @@ pipeline {
             }
         }
         stage('Documentation') {
-            environment {
-                GOCACHE = ""
-                GOMODCACHE = ""
-            }
             steps {
                 withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                     genDocumentation()
