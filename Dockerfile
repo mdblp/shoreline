@@ -7,7 +7,7 @@ ENV GO111MODULE=on
 WORKDIR /go/src/github.com/mdblp/shoreline
 RUN adduser -D tidepool && \
     chown -R tidepool /go/src/github.com/mdblp/shoreline
-RUN apk add --no-cache git gcc musl-dev
+RUN apk add --no-cache git
 USER tidepool
 COPY --chown=tidepool . .
 ARG TARGETPLATFORM
