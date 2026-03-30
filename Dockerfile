@@ -17,12 +17,8 @@ RUN ./build.sh $TARGETPLATFORM
 CMD ["./dist/shoreline"]
 
 # Production
-FROM --platform=$BUILDPLATFORM alpine:latest AS production
-WORKDIR /home/tidepool
-RUN apk --no-cache update && \
-    apk --no-cache upgrade && \
-    apk add --no-cache ca-certificates && \
-    adduser -D tidepool
-USER tidepool
-COPY --from=development --chown=tidepool /go/src/github.com/mdblp/shoreline/dist/shoreline .
+FROM gcr.io/distroless/static:nonroot AS production
+WORKDIR /home/nonroot
+USER nonroot
+COPY --from=development --chown=nonroot /go/src/github.com/mdblp/shoreline/dist/shoreline .
 CMD ["./shoreline"]
