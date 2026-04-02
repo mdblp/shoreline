@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.5.1 - 2026-04-01
+### Fixed
+- Update lib github.com/golang-jwt to fix CVE CVE-2024-51744
+
 ## 2.5.0 - 2026-03-31
 ### Changed
 - Fix remove CGO

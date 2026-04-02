@@ -10,6 +10,8 @@ shoreline
 coverage.out
 coverReport.html
 
+node_modules
+
 test-report.xml
 testresults.txt
 

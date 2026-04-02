@@ -1,0 +1,70 @@
+name: Validate PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate-pr-title:
+    name: Validate PR title follows Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title (Conventional Commits format)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            revert
+            refactor
+            docs
+            style
+            test
+            chore
+            ci
+          # Scope is optional
+          requireScope: false
+          subjectPattern: ^(\[YLP-\d+\] )?[a-z].+$
+          subjectPatternError: |
+            The subject "{subject}" in PR title "{title}" is invalid.
+
+            Expected format:
+              feat(teams): [YLP-1234] add lead clinician role     ← ticket required for feat/fix/perf/revert/refactor
+              fix(auth): [YLP-5678] handle expired token
+              chore(deps): bump go-common to 1.9.0                ← ticket optional for chore/ci/docs/test/style
+
+            Rules:
+              • Subject must start with a lowercase letter or [YLP-XXXX]
+              • Jira ticket format: [YLP-followed by digits]
+
+      # Second step: enforce [YLP-XXXX] is present for product-impacting types
+      - name: Enforce Jira ticket for product types
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const productTypes = ['feat', 'fix', 'perf'];
+            const conventionalPattern = /^(\w+)(\(.+\))?!?:\s+(.*)$/;
+            const jiraPattern = /\[YLP-\d+\]/;
+
+            const match = title.match(conventionalPattern);
+            if (!match) {
+              // Let the previous step handle the format error
+              return;
+            }
+
+            const type = match[1];
+            const subject = match[3];
+
+            if (productTypes.includes(type) && !jiraPattern.test(subject)) {
+              core.setFailed(
+                `PR title "${title}" is missing a Jira ticket reference.\n\n` +
+                `The type "${type}" requires a [YLP-XXXX] ticket in the subject.\n\n` +
+                `Expected: ${type}${match[2] || ''}: [YLP-1234] your description`
+              );
+            }
+

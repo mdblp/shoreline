@@ -3,7 +3,7 @@ module github.com/mdblp/shoreline
 go 1.26
 
 require (
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/mdblp/go-common/v2 v2.2.0
