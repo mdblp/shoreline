@@ -6,8 +6,12 @@ export GO111MODULE=on
 
 TARGETPLATFORM=$1
 if [ "$TARGETPLATFORM" = "linux/arm64" ]; then
-    export GOOS=darwin
+    export GOOS=linux
     export GOARCH=arm64
+else
+    # Default to linux/amd64 regardless of the build machine OS (e.g. macOS)
+    export GOOS=linux
+    export GOARCH=amd64
 fi
 export CGO_ENABLED=0
 

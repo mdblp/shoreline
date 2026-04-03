@@ -17,7 +17,7 @@ RUN ./build.sh $TARGETPLATFORM
 CMD ["./dist/shoreline"]
 
 # Production
-FROM --platform=$BUILDPLATFORM gcr.io/distroless/static:nonroot AS production
+FROM gcr.io/distroless/static:nonroot AS production
 WORKDIR /home/mdblp
 USER nonroot
 COPY --from=development --chown=nonroot /go/src/github.com/mdblp/shoreline/dist/shoreline .
