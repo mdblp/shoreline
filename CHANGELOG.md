@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.5.2 - 2026-04-03
+### Fixed
+- Docker build compatible with Apple Silicon (M1/M2) by using multi-arch images
+
 ## 2.5.1 - 2026-04-01
 ### Fixed
 - Update lib github.com/golang-jwt to fix CVE CVE-2024-51744
