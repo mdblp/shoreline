@@ -2,6 +2,11 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.5.4 - 2026-06-15
+### Changed
+- Upload SBOM to SBOM manager
+- Fix CVE
+
 ## 2.5.3 - 2026-04-03
 ### Fixed
 - Docker build compatible with Apple Silicon (M1/M2) 
