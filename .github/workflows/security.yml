@@ -15,6 +15,7 @@ jobs:
         with:
           go-version-input: 1.26
           go-package: ./...
+          
   SBOM:
     uses: mdblp/.github/.github/workflows/sbom.yml@main
     with:
