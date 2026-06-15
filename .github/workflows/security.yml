@@ -15,7 +15,7 @@ jobs:
         with:
           go-version-input: 1.26
           go-package: ./...
-  sbom:
+  SBOM:
     uses: mdblp/.github/.github/workflows/sbom.yml@main
     with:
       app-name: notification
