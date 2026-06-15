@@ -9,6 +9,8 @@ jobs:
   govulncheck_job:
     runs-on: ubuntu-latest
     name: Run govulncheck
+    env:
+      GOPRIVATE: github.com/mdblp
     steps:
       - uses: actions/checkout@v4
       - uses: mdblp/.github/.github/actions/setup-go-private@main
@@ -22,5 +24,5 @@ jobs:
   SBOM:
     uses: mdblp/.github/.github/workflows/sbom.yml@main
     with:
-      app-name: notification
+      app-name: shoreline
     secrets: inherit
