@@ -1,0 +1,12 @@
+name: Security
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sbom:
+    uses: mdblp/.github/.github/workflows/sbom.yml@main
+    with:
+      app-name: shoreline
+    secrets: inherit
