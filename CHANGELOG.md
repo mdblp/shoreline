@@ -4,7 +4,7 @@ Shoreline is the module that manages user accounts and authentication.
 
 ## 2.5.5 - 2026-06-18
 ### fix
-- YLP-39880 Bump go-router to fix token validation
+- YLP-3988 Bump go-router to fix token validation
 
 ## 2.5.4 - 2026-06-16
 ### fix
