@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.5.5 - 2026-10-05
+### fix
+- YLP-0000 Fix CVEs: Go 1.26.8, golang.org/x/crypto 0.56.0, golang.org/x/text 0.41.0
+
 ## 2.5.4 - 2026-06-16
 ### fix
 - YLP-3980 Fix CVE and upload SBOM
