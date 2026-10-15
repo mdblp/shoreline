@@ -1,4 +1,4 @@
-@Library('mdblp-library') _
+@Library('mdblp-library@fix/rm-rf-nexus') _
 def builderImage
 pipeline {
     agent {
