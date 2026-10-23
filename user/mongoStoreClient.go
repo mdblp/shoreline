@@ -8,11 +8,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	goComMgo "github.com/mdblp/go-db/mongo"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	goComMgo "github.com/mdblp/go-db/v3/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/mdblp/shoreline/common/logging"
 	"github.com/mdblp/shoreline/token"
@@ -76,7 +75,7 @@ func mgoDirtyCollection(c *Client) *mongo.Collection {
 }
 
 func (c *Client) UpsertUser(ctx context.Context, user *User) error {
-	options := options.Update().SetUpsert(true)
+	options := options.UpdateOne().SetUpsert(true)
 	update := bson.M{"$set": user}
 	// if the user already exists we update otherwise we add
 	_, err := mgoUsersCollection(c).UpdateOne(ctx, bson.M{"userid": user.Id}, update, options)
@@ -115,7 +114,7 @@ func (c *Client) findDirtyUser(ctx context.Context, filter interface{}, resultMe
 }
 
 func (c *Client) UpsertDirty(ctx context.Context, username string) error {
-	options := options.Update().SetUpsert(true)
+	options := options.UpdateOne().SetUpsert(true)
 	update := bson.M{"$set": bson.M{"username": username}}
 	// if the user already exists we update otherwise we add
 	_, err := mgoDirtyCollection(c).UpdateOne(ctx, bson.M{"username": username}, update, options)
@@ -146,7 +145,7 @@ func (c *Client) ExistDirtyUser(ctx context.Context, username string) (res bool)
 	fieldsToMatch := []bson.M{}
 
 	if username != "" {
-		regexFilter := primitive.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(username)), Options: "i"}
+		regexFilter := bson.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(username)), Options: "i"}
 		fieldsToMatch = append(fieldsToMatch, bson.M{"username": bson.M{"$regex": regexFilter}})
 	}
 
@@ -179,7 +178,7 @@ func (c *Client) FindUsers(ctx context.Context, user *User) (results []*User, er
 	//Finally try another strategy (not using indexes)
 	fieldsToMatch := []bson.M{}
 	if user.Username != "" {
-		regexFilter := primitive.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(user.Username)), Options: "i"}
+		regexFilter := bson.Regex{Pattern: fmt.Sprintf(`^%s$`, regexp.QuoteMeta(user.Username)), Options: "i"}
 		fieldsToMatch = append(fieldsToMatch, bson.M{"username": bson.M{"$regex": regexFilter}})
 	}
 	if len(user.Emails) > 0 {
@@ -215,7 +214,7 @@ func (c *Client) RemoveUser(ctx context.Context, user *User) (err error) {
 }
 
 func (c *Client) AddToken(ctx context.Context, st *token.SessionToken) error {
-	options := options.Update().SetUpsert(true)
+	options := options.UpdateOne().SetUpsert(true)
 	update := bson.M{"$set": st}
 	// if the user already exists we update otherwise we add
 	_, err := mgoTokensCollection(c).UpdateOne(ctx, bson.M{"_id": st.ID}, update, options)

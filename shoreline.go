@@ -37,7 +37,7 @@ import (
 	"github.com/mdblp/shoreline/user/middlewares"
 
 	"github.com/mdblp/go-common/v2/clients/version"
-	"github.com/mdblp/go-db/mongo"
+	"github.com/mdblp/go-db/v3/mongo"
 )
 
 func main() {
