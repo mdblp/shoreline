@@ -18,8 +18,8 @@ RUN wget -nv https://golang.org/dl/$GO_ARCHIVE && \
     rm -v /tmp/$GO_ARCHIVE
 
 WORKDIR /root/go/src/github.com/mdblp/shoreline
-ENV TIDEPOOL_STORE_ADDRESSES=localhost:27017
-ENV TIDEPOOL_STORE_DATABASE=test-shoreline
+ENV BLP_STORE_ADDRESSES=localhost:27017
+ENV BLP_STORE_DATABASE=test-shoreline
 
 COPY go.* ./
 RUN \

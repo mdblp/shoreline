@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus/hooks/test"
 
-	"github.com/mdblp/go-db/mongo"
+	"github.com/mdblp/go-db/v3/mongo"
 
 	"github.com/mdblp/shoreline/token"
 )
@@ -18,11 +18,11 @@ func mgoTestSetup() (*Client, error) {
 	var testingConfig = &mongo.Config{}
 	testingConfig.FromEnv()
 	if testingConfig.Database == "" {
-		os.Setenv("TIDEPOOL_STORE_ADDRESSES", "localhost:27018")
-		os.Setenv("TIDEPOOL_STORE_DATABASE", "user_test")
+		os.Setenv("BLP_STORE_ADDRESSES", "localhost:27018")
+		os.Setenv("BLP_STORE_DATABASE", "user_test")
 		testingConfig.FromEnv()
 	}
-	if _, exist := os.LookupEnv("TIDEPOOL_STORE_ADDRESSES"); exist {
+	if _, exist := os.LookupEnv("BLP_STORE_ADDRESSES"); exist {
 		// if mongo connexion information is provided via env var
 		testingConfig.FromEnv()
 	}
