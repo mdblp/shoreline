@@ -2,6 +2,11 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.5.7 - 2026-10-23
+### Changed
+- YLP-4163 Migrate mongo client v1 to v2 (mongo-driver v2.9.2, go-db v3)
+- YLP-4163 BREAKING: store env vars are renamed from `TIDEPOOL_STORE_*` to `BLP_STORE_*` (go-db v3), update the deployment configuration
+
 ## 2.5.6 - 2026-10-15
 ### fix
 - YLP-0000 Update Go to 1.27.2 and golang.org/x/net to 0.60.0
