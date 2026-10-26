@@ -59,7 +59,7 @@ pipeline {
             }
             steps {
                 echo 'start mongo to serve as a testing db'
-                sh 'docker network create shorelinetest${RUN_ID} && docker run --rm -d --net=shorelinetest${RUN_ID} --name=mongo4shoreline${RUN_ID} mongo:4.2'
+                sh 'docker network create shorelinetest${RUN_ID} && docker run --rm -d --net=shorelinetest${RUN_ID} --name=mongo4shoreline${RUN_ID} mongo:8.0'
                 script {
                     docker.image(env.buildImage).inside("-v /var/jenkins/go-cache:/go-cache --net=shorelinetest${RUN_ID}") {
                         withCredentials ([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
