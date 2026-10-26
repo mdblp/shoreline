@@ -1,5 +1,5 @@
 # Development
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine AS development
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS development
 ARG APP_VERSION
 ARG GOPRIVATE
 ARG GITHUB_TOKEN
@@ -12,7 +12,7 @@ USER tidepool
 COPY --chown=tidepool . .
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-RUN git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 RUN ./build.sh $TARGETPLATFORM
 CMD ["./dist/shoreline"]
 

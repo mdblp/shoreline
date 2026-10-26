@@ -60,6 +60,12 @@ jobs:
             const type = match[1];
             const subject = match[3];
 
+            // Dependency bumps (Dependabot) have no Jira ticket to reference,
+            // regardless of type - exempt them by scope instead of by type.
+            if (match[2] === '(deps)') {
+              return;
+            }
+
             if (productTypes.includes(type) && !jiraPattern.test(subject)) {
               core.setFailed(
                 `PR title "${title}" is missing a Jira ticket reference.\n\n` +
