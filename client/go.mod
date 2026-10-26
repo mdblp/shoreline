@@ -1,6 +1,6 @@
 module github.com/mdblp/shoreline/client
 
-go 1.24
+go 1.27
 
 require (
 	github.com/mdblp/go-common/v2 v2.1.1
