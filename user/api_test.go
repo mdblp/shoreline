@@ -1502,6 +1502,58 @@ func Test_Login_Caregiver_From_PublicApi(t *testing.T) {
 	}
 }
 
+func Test_Login_TokenRole(t *testing.T) {
+	tests := []struct {
+		name         string
+		roles        []string
+		expectedRole string
+	}{
+		{
+			// Roles[0] is "caregiver": without the fix, the token would carry the caregiver role
+			name:         "patient and caregiver: patient role is enforced even if caregiver comes first",
+			roles:        []string{"caregiver", "patient"},
+			expectedRole: "patient",
+		},
+		{
+			name:         "patient and caregiver: patient role is kept when it comes first",
+			roles:        []string{"patient", "caregiver"},
+			expectedRole: "patient",
+		},
+		{
+			name:         "caregiver only: caregiver role is kept",
+			roles:        []string{"caregiver"},
+			expectedRole: "caregiver",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authorization := T_CreateAuthorization(t, "a@b.co", "password")
+			responsableStore.FindUsersResponses = []FindUsersResponse{{[]*User{{Id: "1111111111", Username: "a@z.co", Emails: []string{"a@z.co"}, Roles: tt.roles, TermsAccepted: "2016-01-01T01:23:45-08:00", PwHash: "d1fef52139b0d120100726bcb43d5cc13d41e4b5", EmailVerified: true}}, nil}}
+			responsableStore.AddTokenResponses = []error{nil}
+			defer T_ExpectResponsablesEmpty(t)
+
+			headers := http.Header{}
+			headers.Add("Authorization", authorization)
+			headers.Add(HEADER_REQUEST_SOURCE, "public")
+			response := T_PerformRequestHeaders(t, "POST", "/login", headers)
+			T_ExpectSuccessResponseWithJSONMap(t, response, 200)
+
+			sessionToken := response.Header().Get(TP_SESSION_TOKEN)
+			if sessionToken == "" {
+				t.Fatalf("Missing expected %s header", TP_SESSION_TOKEN)
+			}
+			tokenData, err := token.UnpackSessionTokenAndVerify(sessionToken, FAKE_CONFIG.Secret)
+			if err != nil {
+				t.Fatalf("Unable to unpack the session token: %v", err)
+			}
+			if tokenData.Role != tt.expectedRole {
+				t.Fatalf("Unexpected role in token, got [%s] expected [%s]", tokenData.Role, tt.expectedRole)
+			}
+		})
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 func TestServerLogin_StatusBadRequest_WhenNoNameOrSecret(t *testing.T) {

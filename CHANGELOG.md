@@ -2,6 +2,10 @@
 
 Shoreline is the module that manages user accounts and authentication.
 
+## 2.7.0 - 2026-11-20
+### Changed
+- YLP-4218 multi-roles: force patient role in tokens
+
 ## 2.6.0 - 2026-10-26
 ### Changed
 - YLP-4163 Migrate mongo client v1 to v2 (mongo-driver v2.9.2, go-db v3)
