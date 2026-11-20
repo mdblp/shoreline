@@ -840,8 +840,13 @@ func (a *Api) Login(res http.ResponseWriter, req *http.Request) {
 				log.Debugf("Login of a non patient user from our private endpoint. Error while adding the role patient: %s", err)
 			}
 		}
+		mainRole := result.Roles[0]
+		if len(result.Roles) > 1 && result.HasRole("patient") {
+			log.Infof("force patient role to user with multi roles %v", result.Id)
+			mainRole = "patient"
+		}
 
-		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: result.Roles[0]}
+		tokenData := &token.TokenData{DurationSecs: extractTokenDuration(req), UserId: result.Id, Email: result.Username, Name: result.Username, Role: mainRole}
 		tokenConfig := token.TokenConfig{DurationSecs: a.ApiConfig.UserTokenDurationSecs, Secret: a.ApiConfig.Secret}
 		if sessionToken, err := CreateSessionTokenAndSave(req.Context(), tokenData, tokenConfig, a.Store); err != nil {
 			a.sendError(res, http.StatusInternalServerError, STATUS_ERR_UPDATING_TOKEN, log, err)
